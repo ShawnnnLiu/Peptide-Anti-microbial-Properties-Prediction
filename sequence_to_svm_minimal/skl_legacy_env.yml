@@ -1,0 +1,6 @@
+name: skl_legacy
+channels:
+  - defaults
+dependencies:
+  - python=3.7
+prefix: /home/salaars/miniconda3/envs/skl_legacy
