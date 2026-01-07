@@ -1,0 +1,27 @@
+name: esm_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pip:
+    - fair-esm
+    - biotite
+    - pandas
+    - scipy
+    - scikit-learn
+
+# IMPORTANT: After creating this environment, install PyTorch with CUDA support
+# For RTX 5070 (Blackwell) or newer GPUs, use CUDA 12.8:
+#   conda activate esm_env
+#   pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#
+# For older GPUs (RTX 30/40 series), use CUDA 12.1:
+#   pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#
+# The --force-reinstall flag ensures the CUDA version is installed (not CPU-only)
+#
+# Verify GPU is working:
+#   python -c "import torch; print('CUDA available:', torch.cuda.is_available())"

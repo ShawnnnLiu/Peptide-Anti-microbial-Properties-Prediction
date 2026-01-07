@@ -3,4 +3,9 @@ channels:
   - defaults
 dependencies:
   - python=3.7
-prefix: /home/salaars/miniconda3/envs/skl_legacy
+  - pip
+  - pip:
+    - propy3
+    - numpy
+    - scipy
+    - scikit-learn==0.19.2
