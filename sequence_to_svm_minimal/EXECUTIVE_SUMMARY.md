@@ -109,3 +109,4 @@ For modern enhancement: Add ESM-2 embeddings via inference (no training needed w
 
 *Full analysis: See CODEBASE_ANALYSIS_SUMMARY.md (3,500+ words)*
 
+
