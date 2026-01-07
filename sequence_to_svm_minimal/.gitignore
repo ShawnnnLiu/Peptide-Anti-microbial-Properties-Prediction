@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Cache directories
+cache/
+*.cache
+
+# Model checkpoints (large files)
+models/checkpoints/*.pt
+models/checkpoints/*.pth
+!models/checkpoints/.gitkeep
+
+# Data (too large for git)
+data/mic_datasets/*.csv
+data/mic_datasets/*.tsv
+!data/mic_datasets/.gitkeep
+
+# ESMFold cache (can be regenerated)
+cache/esmfold_cache/*.pdb
+cache/esmfold_cache/*.json
+!cache/esmfold_cache/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+temp/
+tmp/
+
