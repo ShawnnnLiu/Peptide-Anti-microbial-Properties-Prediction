@@ -8,10 +8,13 @@ dependencies:
   - numpy
   - pip:
     - fair-esm
+    - transformers  # For HuggingFace ESMFold
+    - omegaconf
     - biotite
     - pandas
     - scipy
     - scikit-learn
+    - accelerate  # Recommended for transformers
 
 # IMPORTANT: After creating this environment, install PyTorch with CUDA support
 # For RTX 5070 (Blackwell) or newer GPUs, use CUDA 12.8:
