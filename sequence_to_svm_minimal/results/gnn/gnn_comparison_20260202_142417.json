@@ -1,0 +1,29 @@
+{
+  "config": {
+    "csv_path": "data/training_dataset/geometric_features_clustered.csv",
+    "pdb_dir": "data/training_dataset",
+    "qsar_csv": "data/training_dataset/qsar12_descriptors.csv",
+    "seed": 42,
+    "n_folds": 2,
+    "epochs": 20,
+    "batch_size": 32,
+    "lr": 0.001,
+    "patience": 5,
+    "hidden_channels": 64,
+    "num_layers": 3,
+    "dropout": 0.2,
+    "distance_threshold": 8.0
+  },
+  "results": {
+    "GCN (Graph-only)": {
+      "auc_roc_mean": 0.9502935420743639,
+      "auc_roc_std": 0.0035225048923678837,
+      "f1_mean": 0.8751872607224103,
+      "f1_std": 0.024440992065693834,
+      "mcc_mean": 0.7723348257591839,
+      "mcc_std": 0.04088487828646814
+    }
+  },
+  "timestamp": "20260202_142417",
+  "curves_dir": "results/gnn/curves/run_20260202_142417"
+}

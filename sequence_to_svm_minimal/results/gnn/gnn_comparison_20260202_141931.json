@@ -1,0 +1,92 @@
+{
+  "config": {
+    "csv_path": "data/training_dataset/geometric_features_clustered.csv",
+    "pdb_dir": "data/training_dataset",
+    "qsar_csv": "data/training_dataset/qsar12_descriptors.csv",
+    "seed": 42,
+    "n_folds": 5,
+    "epochs": 500,
+    "batch_size": 32,
+    "lr": 0.001,
+    "patience": 30,
+    "hidden_channels": 64,
+    "num_layers": 3,
+    "dropout": 0.2,
+    "distance_threshold": 8.0
+  },
+  "results": {
+    "GCN (Graph-only)": {
+      "auc_roc_mean": 0.969948428434455,
+      "auc_roc_std": 0.02330401145236228,
+      "f1_mean": 0.9222436066191761,
+      "f1_std": 0.036302858598652094,
+      "mcc_mean": 0.8547434277252833,
+      "mcc_std": 0.05851155405416595
+    },
+    "GAT (Graph-only)": {
+      "auc_roc_mean": 0.9764326940870885,
+      "auc_roc_std": 0.016826201551436847,
+      "f1_mean": 0.9265249467746658,
+      "f1_std": 0.03161836521078482,
+      "mcc_mean": 0.8587944430744894,
+      "mcc_std": 0.05741286221094637
+    },
+    "EGNN (Graph-only)": {
+      "auc_roc_mean": 0.9743410930063048,
+      "auc_roc_std": 0.006765880505696897,
+      "f1_mean": 0.8922206539637733,
+      "f1_std": 0.016039437636378235,
+      "mcc_mean": 0.7957654984394511,
+      "mcc_std": 0.02790714542687716
+    },
+    "GCN (Graph+Geo24)": {
+      "auc_roc_mean": 0.9761879214300244,
+      "auc_roc_std": 0.022491091679181147,
+      "f1_mean": 0.9169158493211494,
+      "f1_std": 0.028660751310532216,
+      "mcc_mean": 0.8365134836613508,
+      "mcc_std": 0.05254341680564843
+    },
+    "GAT (Graph+Geo24)": {
+      "auc_roc_mean": 0.9786893385031796,
+      "auc_roc_std": 0.016765671459677462,
+      "f1_mean": 0.9099227102462277,
+      "f1_std": 0.028848648491160395,
+      "mcc_mean": 0.8244693219921542,
+      "mcc_std": 0.05336342684630513
+    },
+    "EGNN (Graph+Geo24)": {
+      "auc_roc_mean": 0.9678271110383433,
+      "auc_roc_std": 0.012463494623389942,
+      "f1_mean": 0.9178751462469942,
+      "f1_std": 0.01955982236257957,
+      "mcc_mean": 0.8353533721295644,
+      "mcc_std": 0.043722142312251404
+    },
+    "GCN (Graph+Combined36)": {
+      "auc_roc_mean": 0.9791086401874425,
+      "auc_roc_std": 0.019467655075922328,
+      "f1_mean": 0.9221982920542242,
+      "f1_std": 0.021353738024987145,
+      "mcc_mean": 0.8514036721456669,
+      "mcc_std": 0.03216160723513126
+    },
+    "GAT (Graph+Combined36)": {
+      "auc_roc_mean": 0.9787059414382616,
+      "auc_roc_std": 0.016784395617938513,
+      "f1_mean": 0.9336050232750258,
+      "f1_std": 0.04503835520197215,
+      "mcc_mean": 0.8653317864393231,
+      "mcc_std": 0.092576251004582
+    },
+    "EGNN (Graph+Combined36)": {
+      "auc_roc_mean": 0.9257486326884357,
+      "auc_roc_std": 0.10196326031870685,
+      "f1_mean": 0.8149577489986453,
+      "f1_std": 0.21548114079408326,
+      "mcc_mean": 0.7098380127105568,
+      "mcc_std": 0.2800197817448746
+    }
+  },
+  "timestamp": "20260202_141931"
+}
