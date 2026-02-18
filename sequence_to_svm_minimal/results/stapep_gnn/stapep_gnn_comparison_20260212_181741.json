@@ -1,0 +1,52 @@
+{
+  "config": {
+    "amp_seqs": "data/training_dataset/StaPep/seqs_AMP_stapep.txt",
+    "decoy_seqs": "data/training_dataset/StaPep/seqs_DECOY_stapep.txt",
+    "amp_pdb_dir": "data/training_dataset/StaPep/structures/AMP",
+    "decoy_pdb_dir": "data/training_dataset/StaPep/structures/DECOY",
+    "output_dir": "data/training_dataset/StaPep",
+    "seed": 42,
+    "n_folds": 5,
+    "epochs": 500,
+    "batch_size": 16,
+    "lr": 0.001,
+    "patience": 50,
+    "hidden_channels": 64,
+    "num_layers": 3,
+    "dropout": 0.3,
+    "distance_threshold": 8.0
+  },
+  "dataset": {
+    "total": 541,
+    "amps": 187,
+    "decoys": 354
+  },
+  "results": {
+    "GCN (Graph-only)": {
+      "auc_roc_mean": 0.9972762320723774,
+      "auc_roc_std": 0.0029190445855271797,
+      "f1_mean": 0.9709196831741801,
+      "f1_std": 0.009546265746482993,
+      "mcc_mean": 0.9558894222555402,
+      "mcc_std": 0.014630155858948885
+    },
+    "GAT (Graph-only)": {
+      "auc_roc_mean": 0.9962789539513037,
+      "auc_roc_std": 0.0036936517164576866,
+      "f1_mean": 0.959899981349152,
+      "f1_std": 0.01681335423703406,
+      "mcc_mean": 0.9400167897792443,
+      "mcc_std": 0.024780496452058907
+    },
+    "EGNN (Graph-only)": {
+      "auc_roc_mean": 0.9879710696612106,
+      "auc_roc_std": 0.017837758228376025,
+      "f1_mean": 0.9036884828695445,
+      "f1_std": 0.08941978070650194,
+      "mcc_mean": 0.8750693747702118,
+      "mcc_std": 0.10402279637791283
+    }
+  },
+  "timestamp": "20260212_181741",
+  "curves_dir": "results/stapep_gnn/curves/run_20260212_181741"
+}

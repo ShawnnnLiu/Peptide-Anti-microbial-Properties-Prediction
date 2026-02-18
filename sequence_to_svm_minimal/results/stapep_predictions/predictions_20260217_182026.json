@@ -1,0 +1,403 @@
+{
+  "description": "StaPep AMP candidate predictions using GNN ensemble",
+  "timestamp": "20260217_182026",
+  "config": {
+    "amp_seqs": "data/training_dataset/StaPep/seqs_AMP_stapep.txt",
+    "decoy_seqs": "data/training_dataset/StaPep/seqs_DECOY_stapep.txt",
+    "amp_pdb_dir": "data/training_dataset/StaPep/structures/AMP",
+    "decoy_pdb_dir": "data/training_dataset/StaPep/structures/DECOY",
+    "test_seqs": "data/training_dataset/StaPep/seqs_test_stapled.txt",
+    "test_pdb_dir": "data/training_dataset/StaPep/structures/TEST",
+    "seed": 42,
+    "n_folds": 5,
+    "epochs": 500,
+    "batch_size": 16,
+    "lr": 0.001,
+    "patience": 50,
+    "hidden_channels": 64,
+    "num_layers": 3,
+    "dropout": 0.3,
+    "distance_threshold": 8.0
+  },
+  "candidates": [
+    {
+      "name": "Buf(i+4) 12",
+      "raw": "TRSSRAGLQWPXGRVXRLLRK",
+      "clean": "TRSSRAGLQWPAGRVARLLRK",
+      "notes": "Buforin II, i+4 staple at pos 12,16"
+    },
+    {
+      "name": "Buf(i+4) 13",
+      "raw": "TRSSRAGLQWPVXRVHXLLRK",
+      "clean": "TRSSRAGLQWPVARVHALLRK",
+      "notes": "Buforin II, i+4 staple at pos 13,17"
+    },
+    {
+      "name": "Buf(i+4) 13 Q9K",
+      "raw": "TRSSRAGLKWPVXRVHXLLRK",
+      "clean": "TRSSRAGLKWPVARVHALLRK",
+      "notes": "Buforin II, i+4 staple + Q9K mutation"
+    },
+    {
+      "name": "Buf(i+4) 12 V15K,L19K",
+      "raw": "TRSSRAGLQWPXGRKXRLKRK",
+      "clean": "TRSSRAGLQWPAGRKARLKRK",
+      "notes": "Buforin II, i+4 staple + V15K, L19K mutations"
+    },
+    {
+      "name": "Mag 20",
+      "raw": "GIGKFLHSKK8FGKAFVXEIAKK",
+      "clean": "GIGKFLHSKKFGKAFVAEIAKK",
+      "notes": "Magainin 2, staple variant 20"
+    },
+    {
+      "name": "Mag 25",
+      "raw": "XKGKXLHSKKKFGKAXVGEXAKK",
+      "clean": "AKGKALHSKKKFGKAAVGEAAKK",
+      "notes": "Magainin 2, staple variant 25"
+    },
+    {
+      "name": "Mag 31",
+      "raw": "GXGKFXHSKKKKGKAXVGEXAKK",
+      "clean": "GAGKFAHSKKKKGKAAVGEAAKK",
+      "notes": "Magainin 2, staple variant 31"
+    },
+    {
+      "name": "Mag 36",
+      "raw": "GXGKFXHSKKKK8KAFKGEXAKK",
+      "clean": "GAGKFAHSKKKKKAFKGEAAKK",
+      "notes": "Magainin 2, staple variant 36"
+    }
+  ],
+  "training_set": {
+    "total": 541,
+    "amps": 187,
+    "decoys": 354
+  },
+  "cv_performance": {
+    "gcn": {
+      "auc_roc_mean": 0.9958945135965152,
+      "auc_roc_std": 0.0045537115382893465,
+      "f1_mean": 0.9595988939612324,
+      "f1_std": 0.009058155695574499,
+      "mcc_mean": 0.9390771820559062,
+      "mcc_std": 0.013631913236061655
+    },
+    "gat": {
+      "auc_roc_mean": 0.9974256635116532,
+      "auc_roc_std": 0.00223118686845941,
+      "f1_mean": 0.9627781575149996,
+      "f1_std": 0.01882121331684721,
+      "mcc_mean": 0.943621785182627,
+      "mcc_std": 0.029202453812619118
+    },
+    "egnn": {
+      "auc_roc_mean": 0.9864588097575495,
+      "auc_roc_std": 0.01645758718753294,
+      "f1_mean": 0.919422377492553,
+      "f1_std": 0.02184876819770123,
+      "mcc_mean": 0.8797537936504757,
+      "mcc_std": 0.030818742018486438
+    }
+  },
+  "predictions": {
+    "meta_ensemble": [
+      {
+        "name": "Buf(i+4) 12",
+        "raw_sequence": "TRSSRAGLQWPXGRVXRLLRK",
+        "clean_sequence": "TRSSRAGLQWPAGRVARLLRK",
+        "notes": "Buforin II, i+4 staple at pos 12,16",
+        "is_amp": false,
+        "p_amp": 0.0030619720928370953,
+        "p_amp_std": 0.004664608743041754,
+        "z_confidence": 0.9830907341910359,
+        "lr_confidence": 0.9865640113479439,
+        "pct_confidence": 0.615228813218679
+      },
+      {
+        "name": "Buf(i+4) 13",
+        "raw_sequence": "TRSSRAGLQWPVXRVHXLLRK",
+        "clean_sequence": "TRSSRAGLQWPVARVHALLRK",
+        "notes": "Buforin II, i+4 staple at pos 13,17",
+        "is_amp": false,
+        "p_amp": 0.003877290291711688,
+        "p_amp_std": 0.004637384321540594,
+        "z_confidence": 0.9745762896092923,
+        "lr_confidence": 0.982275552135568,
+        "pct_confidence": 0.5491483717469444
+      },
+      {
+        "name": "Buf(i+4) 13 Q9K",
+        "raw_sequence": "TRSSRAGLKWPVXRVHXLLRK",
+        "clean_sequence": "TRSSRAGLKWPVARVHALLRK",
+        "notes": "Buforin II, i+4 staple + Q9K mutation",
+        "is_amp": false,
+        "p_amp": 0.004804843105375767,
+        "p_amp_std": 0.007999504916369915,
+        "z_confidence": 0.9763499776136808,
+        "lr_confidence": 0.9831644218344486,
+        "pct_confidence": 0.5613324809524816
+      },
+      {
+        "name": "Buf(i+4) 12 V15K,L19K",
+        "raw_sequence": "TRSSRAGLQWPXGRKXRLKRK",
+        "clean_sequence": "TRSSRAGLQWPAGRKARLKRK",
+        "notes": "Buforin II, i+4 staple + V15K, L19K mutations",
+        "is_amp": false,
+        "p_amp": 0.020792623981833458,
+        "p_amp_std": 0.03617720678448677,
+        "z_confidence": 0.9662767493637898,
+        "lr_confidence": 0.9780992694608469,
+        "pct_confidence": 0.4997733363879695
+      },
+      {
+        "name": "Mag 20",
+        "raw_sequence": "GIGKFLHSKK8FGKAFVXEIAKK",
+        "clean_sequence": "GIGKFLHSKKFGKAFVAEIAKK",
+        "notes": "Magainin 2, staple variant 20",
+        "is_amp": false,
+        "p_amp": 0.06888904422521591,
+        "p_amp_std": 0.06881751120090485,
+        "z_confidence": 0.82410070520587,
+        "lr_confidence": 0.8797797668920919,
+        "pct_confidence": 0.18455307396967613
+      },
+      {
+        "name": "Mag 25",
+        "raw_sequence": "XKGKXLHSKKKFGKAXVGEXAKK",
+        "clean_sequence": "AKGKALHSKKKFGKAAVGEAAKK",
+        "notes": "Magainin 2, staple variant 25",
+        "is_amp": false,
+        "p_amp": 0.41338369250297546,
+        "p_amp_std": 0.32599642872810364,
+        "z_confidence": 0.5491240830290637,
+        "lr_confidence": 0.5021848817716028,
+        "pct_confidence": 0.04402204918614783
+      },
+      {
+        "name": "Mag 31",
+        "raw_sequence": "GXGKFXHSKKKKGKAXVGEXAKK",
+        "clean_sequence": "GAGKFAHSKKKKGKAAVGEAAKK",
+        "notes": "Magainin 2, staple variant 31",
+        "is_amp": true,
+        "p_amp": 0.700449526309967,
+        "p_amp_std": 0.28552666306495667,
+        "z_confidence": 0.6618720735779162,
+        "lr_confidence": 0.8952680792627419,
+        "pct_confidence": 0.170153796186316
+      },
+      {
+        "name": "Mag 36",
+        "raw_sequence": "GXGKFXHSKKKK8KAFKGEXAKK",
+        "clean_sequence": "GAGKFAHSKKKKKAFKGEAAKK",
+        "notes": "Magainin 2, staple variant 36",
+        "is_amp": true,
+        "p_amp": 0.501681387424469,
+        "p_amp_std": 0.3328305780887604,
+        "z_confidence": 0.5202123333102892,
+        "lr_confidence": 0.6348190656295594,
+        "pct_confidence": 0.09334258705018511
+      }
+    ],
+    "per_architecture": {
+      "gcn": [
+        {
+          "name": "Buf(i+4) 12",
+          "p_amp": 0.00027421777485869825,
+          "p_amp_std": 0.000198537643882446,
+          "z_confidence": 0.9931757860626796,
+          "lr_confidence": 0.999405801194408,
+          "pct_confidence": 0.7213226745671178
+        },
+        {
+          "name": "Buf(i+4) 13",
+          "p_amp": 0.0009008414926938713,
+          "p_amp_std": 0.0006996630108915269,
+          "z_confidence": 0.9836155841635882,
+          "lr_confidence": 0.9982842913423878,
+          "pct_confidence": 0.6007519124579563
+        },
+        {
+          "name": "Buf(i+4) 13 Q9K",
+          "p_amp": 0.0004995210329070687,
+          "p_amp_std": 0.000409801461501047,
+          "z_confidence": 0.9898698199683764,
+          "lr_confidence": 0.9990560333352272,
+          "pct_confidence": 0.6707121759424508
+        },
+        {
+          "name": "Buf(i+4) 12 V15K,L19K",
+          "p_amp": 0.0003489767259452492,
+          "p_amp_std": 0.0002616303681861609,
+          "z_confidence": 0.9914272620237834,
+          "lr_confidence": 0.9992259476062098,
+          "pct_confidence": 0.6928562143993102
+        },
+        {
+          "name": "Mag 20",
+          "p_amp": 0.06844337284564972,
+          "p_amp_std": 0.0905231311917305,
+          "z_confidence": 0.8068865064479166,
+          "lr_confidence": 0.9043955439718946,
+          "pct_confidence": 0.15549893158986117
+        },
+        {
+          "name": "Mag 25",
+          "p_amp": 0.1543407142162323,
+          "p_amp_std": 0.1887347251176834,
+          "z_confidence": 0.7172035962886594,
+          "lr_confidence": 0.7834962489138074,
+          "pct_confidence": 0.09593685615301739
+        },
+        {
+          "name": "Mag 31",
+          "p_amp": 0.6295016407966614,
+          "p_amp_std": 0.2845735549926758,
+          "z_confidence": 0.5782647208834201,
+          "lr_confidence": 0.7854384268557202,
+          "pct_confidence": 0.09713150189144848
+        },
+        {
+          "name": "Mag 36",
+          "p_amp": 0.349687397480011,
+          "p_amp_std": 0.22099193930625916,
+          "z_confidence": 0.6031843558311176,
+          "lr_confidence": 0.5623483781908523,
+          "pct_confidence": 0.05282997222040342
+        }
+      ],
+      "gat": [
+        {
+          "name": "Buf(i+4) 12",
+          "p_amp": 0.0017097766976803541,
+          "p_amp_std": 0.0012345440918579698,
+          "z_confidence": 0.9881356982026658,
+          "lr_confidence": 0.9920532853559263,
+          "pct_confidence": 0.4666316325591995
+        },
+        {
+          "name": "Buf(i+4) 13",
+          "p_amp": 0.004004849586635828,
+          "p_amp_std": 0.0025710638146847486,
+          "z_confidence": 0.9763084554808825,
+          "lr_confidence": 0.9858929389750097,
+          "pct_confidence": 0.35853578650379003
+        },
+        {
+          "name": "Buf(i+4) 13 Q9K",
+          "p_amp": 0.002535170176997781,
+          "p_amp_std": 0.001964566297829151,
+          "z_confidence": 0.9841849709985679,
+          "lr_confidence": 0.9900318480228579,
+          "pct_confidence": 0.4222344923203536
+        },
+        {
+          "name": "Buf(i+4) 12 V15K,L19K",
+          "p_amp": 0.0019187864381819963,
+          "p_amp_std": 0.001112768310122192,
+          "z_confidence": 0.9852831011990648,
+          "lr_confidence": 0.9905957830032335,
+          "pct_confidence": 0.43344588324021394
+        },
+        {
+          "name": "Mag 20",
+          "p_amp": 0.08650786429643631,
+          "p_amp_std": 0.05932685360312462,
+          "z_confidence": 0.8329992158871251,
+          "lr_confidence": 0.8515386611457499,
+          "pct_confidence": 0.08392425619924748
+        },
+        {
+          "name": "Mag 25",
+          "p_amp": 0.2852410674095154,
+          "p_amp_std": 0.15068285167217255,
+          "z_confidence": 0.6312678160511287,
+          "lr_confidence": 0.5266970893997721,
+          "pct_confidence": 0.022214425339669774
+        },
+        {
+          "name": "Mag 31",
+          "p_amp": 0.49508944153785706,
+          "p_amp_std": 0.19815021753311157,
+          "z_confidence": 0.5004278508593237,
+          "lr_confidence": 0.7653873939355534,
+          "pct_confidence": 0.009534925473552835
+        },
+        {
+          "name": "Mag 36",
+          "p_amp": 0.2534754276275635,
+          "p_amp_std": 0.17910532653331757,
+          "z_confidence": 0.6595882547385683,
+          "lr_confidence": 0.5322220513077925,
+          "pct_confidence": 0.026562989121588165
+        }
+      ],
+      "egnn": [
+        {
+          "name": "Buf(i+4) 12",
+          "p_amp": 0.0072019221261143684,
+          "p_amp_std": 0.006080544088035822,
+          "z_confidence": 0.9807404784674653,
+          "lr_confidence": 0.960192122812453,
+          "pct_confidence": 0.6417554389220812
+        },
+        {
+          "name": "Buf(i+4) 13",
+          "p_amp": 0.006726180203258991,
+          "p_amp_std": 0.006358020007610321,
+          "z_confidence": 0.9862432357038043,
+          "lr_confidence": 0.9629304031468501,
+          "pct_confidence": 0.6907652067010667
+        },
+        {
+          "name": "Buf(i+4) 13 Q9K",
+          "p_amp": 0.011379838921129704,
+          "p_amp_std": 0.011001409031450748,
+          "z_confidence": 0.9694240848603015,
+          "lr_confidence": 0.9547178306898972,
+          "pct_confidence": 0.5660249106608437
+        },
+        {
+          "name": "Buf(i+4) 12 V15K,L19K",
+          "p_amp": 0.06011010333895683,
+          "p_amp_std": 0.04006288945674896,
+          "z_confidence": 0.8774894373117506,
+          "lr_confidence": 0.9091704684131258,
+          "pct_confidence": 0.2933564968846274
+        },
+        {
+          "name": "Mag 20",
+          "p_amp": 0.05171589180827141,
+          "p_amp_std": 0.04344993457198143,
+          "z_confidence": 0.8936392834890654,
+          "lr_confidence": 0.9177678238524756,
+          "pct_confidence": 0.3227522696882621
+        },
+        {
+          "name": "Mag 25",
+          "p_amp": 0.8005693554878235,
+          "p_amp_std": 0.16449418663978577,
+          "z_confidence": 0.6241874634652951,
+          "lr_confidence": 0.8380940592329732,
+          "pct_confidence": 0.16413004898550887
+        },
+        {
+          "name": "Mag 31",
+          "p_amp": 0.9767576456069946,
+          "p_amp_std": 0.027898594737052917,
+          "z_confidence": 0.8160849143790009,
+          "lr_confidence": 0.9978870563050146,
+          "pct_confidence": 0.34694685420695004
+        },
+        {
+          "name": "Mag 36",
+          "p_amp": 0.9018813967704773,
+          "p_amp_std": 0.08089537173509598,
+          "z_confidence": 0.6867229123844432,
+          "lr_confidence": 0.9432729380160874,
+          "pct_confidence": 0.20967795497211544
+        }
+      ]
+    }
+  }
+}
