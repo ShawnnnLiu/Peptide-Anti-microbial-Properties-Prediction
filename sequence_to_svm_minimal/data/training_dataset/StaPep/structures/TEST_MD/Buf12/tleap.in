@@ -1,0 +1,15 @@
+source leaprc.protein.ff14SB
+source leaprc.water.tip3p
+set default PBRadii mbondi3
+loadAmberPrep /mnt/c/Users/bioin/Documents/SVM_ESM_Peptides/stapep_package/stapep/templates/PS5/ps5.prepin
+loadAmberParams /mnt/c/Users/bioin/Documents/SVM_ESM_Peptides/stapep_package/stapep/templates/PS5/frcmod.ps5
+pep = sequence { THR ARG SER SER ARG ALA GLY LEU GLN TRP PRO PS5 GLY ARG VAL PS5 ARG LEU LEU ARG LYS }
+bond pep.12.C2 pep.16.C2
+saveAmberParm pep pep_vac.prmtop pep_vac.inpcrd
+savepdb pep pep_vac.pdb
+solvatebox pep TIP3PBOX 10.0
+addions pep Na+ 0
+addions pep Cl- 0
+saveAmberParm pep pep.prmtop pep.inpcrd
+savepdb pep pep_solv.pdb
+quit
