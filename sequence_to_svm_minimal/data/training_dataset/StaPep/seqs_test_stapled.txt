@@ -1,6 +1,6 @@
 # Stapled peptide candidates for AMP prediction
 # X = stapling position (replaced with Alanine for structure prediction)
-# 8 = R8 stapling code (removed for structure prediction)
+# 8 = R8 stapling code (replaced with Alanine for structure prediction, same as X)
 # Format: index clean_sequence
 # Candidate mapping:
 #   1 = Buf(i+4) 12      | raw: TRSSRAGLQWPXGRVXRLLRK
@@ -15,7 +15,7 @@
 2 TRSSRAGLQWPVARVHALLRK
 3 TRSSRAGLKWPVARVHALLRK
 4 TRSSRAGLQWPAGRKARLKRK
-5 GIGKFLHSKKFGKAFVAEIAKK
+5 GIGKFLHSKKAFGKAFVAEIAKK
 6 AKGKALHSKKKFGKAAVGEAAKK
 7 GAGKFAHSKKKKGKAAVGEAAKK
-8 GAGKFAHSKKKKKAFKGEAAKK
+8 GAGKFAHSKKKKAKAFKGEAAKK

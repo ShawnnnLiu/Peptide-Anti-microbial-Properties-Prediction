@@ -88,8 +88,9 @@ TEST_NAMES = {
 
 # Map non-standard / staple AA codes → nearest standard AA for propy compatibility
 _NON_STANDARD = str.maketrans({
-    "X": "A",   # S5 / R5 staple → alanine (alpha-methyl backbone, similar size)
-    "Z": "K",   # R8 staple      → lysine  (long side-chain cross-link)
+    "X": "A",   # S5 / R5 staple → alanine  (alpha-methyl backbone, similar size)
+    "8": "A",   # R8 staple code → alanine  (same treatment as X per advisor note)
+    "Z": "K",   # Z-code staple  → lysine   (long side-chain cross-link)
     "J": "L",   # norleucine     → leucine  (iso-structural)
     "B": "N",   # Asx ambiguity  → asparagine
     "O": "K",   # pyrrolysine    → lysine
