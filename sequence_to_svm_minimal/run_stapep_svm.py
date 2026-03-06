@@ -10,14 +10,10 @@ the approach of the 2016 PNAS SVM paper:
   • Probabilities : Platt scaling  (SVC probability=True → P(+1) output)
   • Tuning        : GridSearchCV over C and gamma, 5-fold stratified CV
 
-Seven feature-set combinations:
+Three feature-set combinations:
   1. StaPep      — StaPep MD / sequence features (17)
-  2. Geo         — ESMFold geometric descriptors  (24)
-  3. QSAR        — 12 descriptors from 2016 PNAS SVM paper
-  4. Geo+StaPep  — Geometric ∪ StaPep
-  5. QSAR+Geo    — QSAR ∪ Geometric
-  6. QSAR+StaPep — QSAR ∪ StaPep
-  7. QSAR+G+SP   — All three combined
+  2. QSAR        — 12 descriptors from 2016 PNAS SVM paper
+  3. QSAR+StaPep — QSAR ∪ StaPep
 
 Usage
 -----
@@ -45,14 +41,10 @@ STAPEP = BASE / "data" / "training_dataset" / "StaPep"
 PATHS = {
     "amp_stapep"  : STAPEP / "stapled_amps_features.csv",
     "decoy_stapep": STAPEP / "stapled_decoys.csv",
-    "amp_geo"     : STAPEP / "stapep_amp_geometric.csv",
-    "decoy_geo"   : STAPEP / "stapep_decoy_geometric.csv",
     "amp_qsar"    : STAPEP / "qsar_stapled_amps.csv",
     "decoy_qsar"  : STAPEP / "qsar_stapled_decoys.csv",
     "test_stapep" : STAPEP / "test_stapled_features.csv",
-    "test_geo"    : STAPEP / "test_stapled_geometric.csv",
     "test_qsar"   : STAPEP / "qsar_stapled_test.csv",
-    "amp_csv"     : STAPEP / "stapled_amps.csv",
 }
 
 # ── Feature column lists ───────────────────────────────────────────────────────
@@ -61,17 +53,6 @@ STAPEP_COLS = [
     "isoelectric_point", "fraction_arginine", "fraction_lysine",
     "lyticity_index", "helix_percent", "sheet_percent", "loop_percent",
     "mean_bfactor", "mean_gyrate", "num_hbonds", "psa", "sasa",
-]
-
-GEO_COLS = [
-    "plddt_mean", "plddt_std", "plddt_min", "plddt_max",
-    "radius_gyration", "end_to_end_distance", "max_pairwise_distance",
-    "centroid_distance_mean", "centroid_distance_std",
-    "fraction_helix", "fraction_sheet", "fraction_coil",
-    "total_sasa", "hydrophobic_sasa", "fraction_hydrophobic_sasa",
-    "length", "net_charge", "mean_hydrophobicity", "hydrophobic_moment",
-    "curvature_mean", "curvature_std", "curvature_max",
-    "torsion_mean", "torsion_std",
 ]
 
 QSAR_COLS = [
@@ -118,7 +99,7 @@ def _dedup(primary: list, secondary: list) -> list:
 
 # ── Data loading ───────────────────────────────────────────────────────────────
 def load_training():
-    """Return (amp_sp, dec_sp, amp_geo, dec_geo, amp_qsar, dec_qsar)."""
+    """Return (amp_sp, dec_sp, amp_qsar, dec_qsar)."""
     # StaPep
     amp_sp = pd.read_csv(PATHS["amp_stapep"]).rename(
         columns={"DRAMP_ID": "peptide_id", "Hiden_Sequence": "sequence"})
@@ -129,27 +110,6 @@ def load_training():
     dec_sp["join_id"] = (dec_sp.reset_index(drop=True).index + 1).astype(str)
     amp_sp = amp_sp.dropna(subset=_present(amp_sp, STAPEP_COLS), how="all")
     dec_sp = dec_sp.dropna(subset=_present(dec_sp, STAPEP_COLS), how="all")
-
-    # Geometric
-    amp_geo = pd.DataFrame(); dec_geo = pd.DataFrame()
-    if PATHS["amp_geo"].exists():
-        amp_geo = pd.read_csv(PATHS["amp_geo"])
-        if "external_id" in amp_geo.columns:
-            amp_geo["join_id"] = amp_geo["external_id"].astype(str)
-        else:
-            amp_csv = pd.read_csv(PATHS["amp_csv"])
-            idx2id  = {str(i+1): str(r["DRAMP_ID"]) for i, r in amp_csv.iterrows()}
-            amp_geo["join_id"] = amp_geo["seq_index"].astype(str).map(idx2id)
-        amp_geo["label"] = 1
-    else:
-        print("  ⚠  AMP geo file missing — run build_stapep_geo.py first")
-
-    if PATHS["decoy_geo"].exists():
-        dec_geo = pd.read_csv(PATHS["decoy_geo"])
-        dec_geo["label"]   = 0
-        dec_geo["join_id"] = dec_geo["seq_index"].astype(str)
-    else:
-        print("  ⚠  Decoy geo file missing — run build_stapep_geo.py first")
 
     # QSAR
     amp_qsar = pd.DataFrame(); dec_qsar = pd.DataFrame()
@@ -167,22 +127,17 @@ def load_training():
     else:
         print("  ⚠  Decoy QSAR file missing — run extract_stapep_qsar.py first")
 
-    return amp_sp, dec_sp, amp_geo, dec_geo, amp_qsar, dec_qsar
+    return amp_sp, dec_sp, amp_qsar, dec_qsar
 
 
 def load_test():
-    """Return (test_sp, test_geo, test_qsar)."""
-    test_sp = pd.DataFrame(); test_geo = pd.DataFrame(); test_qsar = pd.DataFrame()
+    """Return (test_sp, test_qsar)."""
+    test_sp = pd.DataFrame(); test_qsar = pd.DataFrame()
 
     if PATHS["test_stapep"].exists():
         test_sp = pd.read_csv(PATHS["test_stapep"])
     else:
         print("  ⚠  Test StaPep missing — run run_test_stapep_md.py in WSL")
-
-    if PATHS["test_geo"].exists():
-        test_geo = pd.read_csv(PATHS["test_geo"])
-    else:
-        print("  ⚠  Test geo missing — run build_stapep_geo.py first")
 
     if PATHS["test_qsar"].exists():
         test_qsar = pd.read_csv(PATHS["test_qsar"])
@@ -192,10 +147,10 @@ def load_test():
     else:
         print("  ⚠  Test QSAR missing — run extract_stapep_qsar.py first")
 
-    return test_sp, test_geo, test_qsar
+    return test_sp, test_qsar
 
 
-# ── Feature matrix builders (same logic as run_stapep_mlp.py) ─────────────────
+# ── Feature matrix builders ────────────────────────────────────────────────────
 def _concat_merge(amp_frames, dec_frames, col_sets):
     all_cols = []
     for cs in col_sets:
@@ -227,14 +182,6 @@ def build_sp_matrix(amp_sp, dec_sp):
     return train[cols].values.astype(float), train["label"].values, pd.Index(cols)
 
 
-def build_geo_matrix(amp_geo, dec_geo):
-    cols  = list(dict.fromkeys(_present(amp_geo, GEO_COLS) +
-                               _present(dec_geo, GEO_COLS)))
-    train = pd.concat([amp_geo[["label"] + cols],
-                       dec_geo[["label"] + cols]], ignore_index=True)
-    return train[cols].values.astype(float), train["label"].values, pd.Index(cols)
-
-
 def build_qsar_matrix(amp_qsar, dec_qsar):
     cols  = list(dict.fromkeys(_present(amp_qsar, QSAR_COLS) +
                                _present(dec_qsar, QSAR_COLS)))
@@ -243,35 +190,11 @@ def build_qsar_matrix(amp_qsar, dec_qsar):
     return train[cols].values.astype(float), train["label"].values, pd.Index(cols)
 
 
-def build_geo_sp_matrix(amp_sp, dec_sp, amp_geo, dec_geo):
-    sp_cols  = _present(amp_sp, STAPEP_COLS)
-    geo_only = _dedup(sp_cols, _present(amp_geo, GEO_COLS))
-    return _concat_merge([amp_sp, amp_geo], [dec_sp, dec_geo],
-                         [sp_cols, geo_only])
-
-
-def build_qsar_geo_matrix(amp_geo, dec_geo, amp_qsar, dec_qsar):
-    geo_cols  = _present(amp_geo, GEO_COLS)
-    qsar_only = _dedup(geo_cols, QSAR_COLS)
-    return _concat_merge([amp_geo, amp_qsar], [dec_geo, dec_qsar],
-                         [geo_cols, qsar_only])
-
-
 def build_qsar_sp_matrix(amp_sp, dec_sp, amp_qsar, dec_qsar):
     sp_cols   = _present(amp_sp, STAPEP_COLS)
     qsar_only = _dedup(sp_cols, QSAR_COLS)
     return _concat_merge([amp_sp, amp_qsar], [dec_sp, dec_qsar],
                          [sp_cols, qsar_only])
-
-
-def build_qsar_geo_sp_matrix(amp_sp, dec_sp, amp_geo, dec_geo,
-                              amp_qsar, dec_qsar):
-    sp_cols   = _present(amp_sp, STAPEP_COLS)
-    geo_only  = _dedup(sp_cols,            _present(amp_geo, GEO_COLS))
-    qsar_only = _dedup(sp_cols + geo_only, QSAR_COLS)
-    return _concat_merge([amp_sp,  amp_geo,  amp_qsar],
-                         [dec_sp,  dec_geo,  dec_qsar],
-                         [sp_cols, geo_only, qsar_only])
 
 
 # ── SVM pipeline & tuning ─────────────────────────────────────────────────────
@@ -445,36 +368,24 @@ def main(cv_folds: int = 5):
     print("  (Following 2016 PNAS paper: RBF kernel + Z-score + Platt probs)")
     print("=" * 72)
 
-    amp_sp, dec_sp, amp_geo, dec_geo, amp_qsar, dec_qsar = load_training()
-    test_sp, test_geo, test_qsar = load_test()
+    amp_sp, dec_sp, amp_qsar, dec_qsar = load_training()
+    test_sp, test_qsar = load_test()
 
-    geo_avail  = not amp_geo.empty  and not dec_geo.empty
     qsar_avail = not amp_qsar.empty and not dec_qsar.empty
 
     print(f"\n  Training data:")
     print(f"    StaPep — AMPs: {len(amp_sp):>3}   Decoys: {len(dec_sp):>3}")
-    if geo_avail:
-        print(f"    Geo    — AMPs: {len(amp_geo):>3}   Decoys: {len(dec_geo):>3}")
     if qsar_avail:
         print(f"    QSAR   — AMPs: {len(amp_qsar):>3}   Decoys: {len(dec_qsar):>3}")
-    print(f"  Test peptides — StaPep:{len(test_sp)}  Geo:{len(test_geo)}  QSAR:{len(test_qsar)}")
+    print(f"  Test peptides — StaPep:{len(test_sp)}  QSAR:{len(test_qsar)}")
 
     # ── Build feature matrices ─────────────────────────────────────────────
     models_train: dict = {}
-    models_train["StaPep"]    = build_sp_matrix(amp_sp, dec_sp)
-
-    if geo_avail:
-        models_train["Geo"]       = build_geo_matrix(amp_geo, dec_geo)
-        models_train["Geo+SP"]    = build_geo_sp_matrix(amp_sp, dec_sp, amp_geo, dec_geo)
+    models_train["StaPep"] = build_sp_matrix(amp_sp, dec_sp)
 
     if qsar_avail:
-        models_train["QSAR"]      = build_qsar_matrix(amp_qsar, dec_qsar)
-        if geo_avail:
-            models_train["QSAR+Geo"]  = build_qsar_geo_matrix(amp_geo, dec_geo, amp_qsar, dec_qsar)
-        models_train["QSAR+SP"]   = build_qsar_sp_matrix(amp_sp, dec_sp, amp_qsar, dec_qsar)
-        if geo_avail:
-            models_train["QSAR+G+SP"] = build_qsar_geo_sp_matrix(
-                amp_sp, dec_sp, amp_geo, dec_geo, amp_qsar, dec_qsar)
+        models_train["QSAR"]    = build_qsar_matrix(amp_qsar, dec_qsar)
+        models_train["QSAR+SP"] = build_qsar_sp_matrix(amp_sp, dec_sp, amp_qsar, dec_qsar)
 
     # ── Cross-validation (GridSearchCV per feature set) ────────────────────
     print(f"\n{'─'*72}")
@@ -500,7 +411,6 @@ def main(cv_folds: int = 5):
     for name, (X_tr, y_tr, feat_names) in models_train.items():
         dfs = []
         if "SP"   in name or name == "StaPep": dfs.append(test_sp)
-        if "Geo"  in name or name == "Geo":    dfs.append(test_geo)
         if "QSAR" in name:                     dfs.append(test_qsar)
         if not dfs:
             dfs = [test_sp]

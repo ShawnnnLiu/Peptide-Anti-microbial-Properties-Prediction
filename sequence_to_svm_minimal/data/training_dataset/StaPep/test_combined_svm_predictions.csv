@@ -1,0 +1,9 @@
+peptide_id,P_AMP_QSAR_(pretrained),P_AMP_QSAR+StaPep_(trained),P_AMP_StaPep_(trained)
+Buf12,0.9078,0.8995,0.9214
+Buf13,0.9078,0.7479,0.6607
+Buf13_Q9K,0.9655,0.8304,0.9879
+Buf12_V15K_L19K,0.9845,0.943,1.0
+Mag20,0.9702,1.0,1.0
+Mag25,0.9773,1.0,1.0
+Mag31,0.9773,0.9892,1.0
+Mag36,0.9773,1.0,1.0

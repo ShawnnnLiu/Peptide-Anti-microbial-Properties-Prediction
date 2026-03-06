@@ -19,8 +19,15 @@ descriptors published in the 2016 PNAS paper:
   tau2_GRAR740104, tau4_GRAR740104,
   QSO50_GRAR740104, QSO29_GRAR740104
 
-Staple positions (X→A, Z/R8→K) are already substituted in the seq files,
-so only standard AAs reach propy – exactly as the original paper intended.
+QSAR sequences for test peptides
+---------------------------------
+Per advisor guidance, QSAR sequences use the NATURAL PARENT residues at staple
+positions (NOT Ala/Lys substitutions), keeping only the biological charge-
+modifying mutations (K substitutions). The C-terminus is also reverted to the
+parent sequence for Mag variants.
+
+  Buf parent : TRSSRAGLQWPVGRVHRLLRK
+  Mag parent : GIGKFLHSAKKFGKAFVGEIMNS
 
 Usage
 -----
@@ -47,7 +54,9 @@ AAINDEX_DIR  = DESC_DIR / "aaindex"
 
 AMP_SEQS_TXT   = STAPEP_DIR / "seqs_AMP_stapep.txt"
 DECOY_SEQS_TXT = STAPEP_DIR / "seqs_DECOY_stapep.txt"
-TEST_SEQS_TXT  = STAPEP_DIR / "seqs_test_stapled.txt"
+# NOTE: test peptides use explicit QSAR sequences (see TEST_QSAR_SEQS below)
+#       NOT derived from seqs_test_stapled.txt — staple positions must revert
+#       to the natural parent residue, not Ala/Lys substitutions.
 
 AMP_CSV        = STAPEP_DIR / "stapled_amps.csv"
 DECOY_CSV      = STAPEP_DIR / "stapled_decoys.csv"
@@ -69,7 +78,7 @@ from propy import AAIndex                        # type: ignore
 from propy import ProCheck                       # type: ignore
 from propy.PyPro import GetProDes                # type: ignore
 
-# Test-peptide name map (from comments in seqs_test_stapled.txt)
+# Test-peptide name map
 TEST_NAMES = {
     1: "Buf(i+4)_12",
     2: "Buf(i+4)_13",
@@ -79,6 +88,36 @@ TEST_NAMES = {
     6: "Mag_25",
     7: "Mag_31",
     8: "Mag_36",
+}
+
+# ---------------------------------------------------------------------------
+# Correct QSAR sequences for the 8 test peptides (per advisor guidance)
+#
+# Rule: use the NATURAL PARENT residues at staple positions (not A/K
+# substitutions).  Only biological charge-modifying K mutations are kept.
+# Mag C-termini are reverted to the parent GEIMNS tail.
+#
+#   Buf parent : TRSSRAGLQWPVGRVHRLLRK        (21 aa)
+#   Mag parent : GIGKFLHSAKKFGKAFVGEIMNS       (23 aa)
+#
+#   Buf12          X(12)→V, X(16)→H           → same as parent
+#   Buf13          X(13)→G, X(17)→R           → same as parent
+#   Buf13_Q9K      Q9K + same reverts
+#   Buf12_V15K,L19K V15K + L19K + X(12)→V, X(16)→H
+#   Mag20          A9K  + X(11)→K, X(18)→G   + parent C-term
+#   Mag25          I2K + A9K + all X→parent   + parent C-term
+#   Mag31          A9K (staple at i=1,15) + all X→parent + parent C-term
+#   Mag36          A9K (staple at i=1,12) + all X→parent + parent C-term
+# ---------------------------------------------------------------------------
+TEST_QSAR_SEQS: dict[int, str] = {
+    1: "TRSSRAGLQWPVGRVHRLLRK",       # Buf12            – parent seq
+    2: "TRSSRAGLQWPVGRVHRLLRK",       # Buf13            – parent seq
+    3: "TRSSRAGLKWPVGRVHRLLRK",       # Buf13_Q9K        – Q9K kept
+    4: "TRSSRAGLQWPVGRKHRLKRK",       # Buf12_V15K,L19K  – V15K + L19K kept
+    5: "GIGKFLHSKKKFGKAFVGEIMNS",     # Mag20            – A9K kept
+    6: "GKGKFLHSKKKFGKAFVGEIMNS",     # Mag25            – I2K + A9K kept
+    7: "GKGKFLHSKKKFGKAFVGEIMNS",     # Mag31            – A9K (pos-2 staple→K)
+    8: "GKGKFLHSKKKFGKAFVGEIMNS",     # Mag36            – A9K (pos-2 staple→K)
 }
 
 
@@ -270,12 +309,15 @@ def main() -> None:
     print(f"\n  ✓ Saved → {OUT_DECOY_QSAR}")
     print(f"    Shape : {df_decoy.shape}  |  Columns: {list(df_decoy.columns)}")
 
-    # 4. Test sequences (skip # comment lines)
-    print(f"\nReading Test sequences from {TEST_SEQS_TXT.name} …")
-    test_seqs = load_seqs_txt(TEST_SEQS_TXT, skip_comments=True)
+    # 4. Test sequences — use hardcoded correct QSAR sequences (parent residues
+    #    at staple positions, only biological K mutations kept)
+    print("\nUsing advisor-confirmed QSAR sequences for test peptides …")
+    test_seqs   = TEST_QSAR_SEQS          # already standard AA — no clean needed
     test_id_map = {idx: TEST_NAMES.get(idx, f"TEST_{idx}") for idx in test_seqs}
 
-    print(f"  {len(test_seqs)} Test sequences loaded.")
+    print(f"  {len(test_seqs)} Test sequences:")
+    for idx, seq in test_seqs.items():
+        print(f"    [{idx}] {TEST_NAMES.get(idx,'?'):30s}  {seq}")
 
     df_test = run_qsar(test_seqs, test_id_map, aap_dict, desc="Test  ")
     # No label for test peptides (unknown)
