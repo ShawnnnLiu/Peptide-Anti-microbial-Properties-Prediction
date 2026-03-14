@@ -6,7 +6,7 @@ RBF-SVM classifier trained on stapled peptides (AMP vs Decoy), following
 the approach of the 2016 PNAS SVM paper:
 
   • Kernel        : RBF  (non-linear; evidenced by 46.5% support-vector ratio)
-  • Normalisation : Z-score per feature (= sklearn StandardScaler)
+  • Normalisation : Z-score per feature (StandardScaler — paper-faithful)
   • Probabilities : Platt scaling  (SVC probability=True → P(+1) output)
   • Tuning        : GridSearchCV over C and gamma, 5-fold stratified CV
 
@@ -198,22 +198,22 @@ def build_qsar_sp_matrix(amp_sp, dec_sp, amp_qsar, dec_qsar):
 
 
 # ── SVM pipeline & tuning ─────────────────────────────────────────────────────
-def _base_pipe() -> Pipeline:
+def _base_pipe(feature_names: pd.Index) -> Pipeline:
     """Impute → Z-score → RBF-SVM (paper-faithful normalisation)."""
     return Pipeline([
         ("imputer", SimpleImputer(strategy="median")),
-        ("scaler",  StandardScaler()),                          # Z-score ≡ paper
+        ("scaler",  StandardScaler()),
         ("svc",     SVC(kernel="rbf",
-                        probability=True,                       # Platt scaling → P(+1)
-                        class_weight="balanced",                # handles class imbalance
+                        probability=True,        # Platt scaling → P(+1)
+                        class_weight="balanced",
                         random_state=42)),
     ])
 
 
-def make_svm_gs(folds: int) -> GridSearchCV:
+def make_svm_gs(folds: int, feature_names: pd.Index) -> GridSearchCV:
     """GridSearchCV wrapping the SVM pipeline — mirrors paper's grid search."""
     return GridSearchCV(
-        _base_pipe(),
+        _base_pipe(feature_names),
         SVM_PARAM_GRID,
         cv=StratifiedKFold(folds, shuffle=True, random_state=42),
         scoring="roc_auc",
@@ -225,12 +225,13 @@ def make_svm_gs(folds: int) -> GridSearchCV:
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
 def cv_score_svm(X: np.ndarray, y: np.ndarray,
-                 label: str, folds: int) -> dict:
+                 label: str, folds: int,
+                 feature_names: pd.Index) -> dict:
     """
     Fit GridSearchCV on (X, y); report CV-AUC for best params
     plus Average Precision recomputed with those params.
     """
-    gs = make_svm_gs(folds)
+    gs = make_svm_gs(folds, feature_names)
     gs.fit(X, y)
 
     best_idx  = gs.best_index_
@@ -239,7 +240,7 @@ def cv_score_svm(X: np.ndarray, y: np.ndarray,
         for i in range(folds)
     ])
 
-    # Recompute AP with best (C, gamma) via cross_val_score
+    # Recompute AP with best (C, gamma)
     best_C     = gs.best_params_["svc__C"]
     best_gamma = gs.best_params_["svc__gamma"]
     pipe_ap    = Pipeline([
@@ -269,9 +270,10 @@ def cv_score_svm(X: np.ndarray, y: np.ndarray,
 
 
 def fit_predict_svm(X_train: np.ndarray, y_train: np.ndarray,
-                    X_test:  np.ndarray, folds: int) -> np.ndarray:
+                    X_test:  np.ndarray, folds: int,
+                    feature_names: pd.Index) -> np.ndarray:
     """GridSearch → refit on all training data → P(AMP=1) for test."""
-    gs = make_svm_gs(folds)
+    gs = make_svm_gs(folds, feature_names)
     gs.fit(X_train, y_train)
     return gs.predict_proba(X_test)[:, 1]
 
@@ -394,9 +396,9 @@ def main(cv_folds: int = 5):
     print(f"{'─'*72}")
 
     cv_results = []
-    for name, (X, y, _) in models_train.items():
+    for name, (X, y, feat_names) in models_train.items():
         print(f"  Tuning [{name}]  (n={len(y)}) ...", end=" ", flush=True)
-        res = cv_score_svm(X, y, name, folds=cv_folds)
+        res = cv_score_svm(X, y, name, folds=cv_folds, feature_names=feat_names)
         cv_results.append(res)
         print(f"done  AUC={res['auc_mean']:.3f}  C={res['best_C']}  γ={res['best_gamma']}")
 
@@ -416,7 +418,9 @@ def main(cv_folds: int = 5):
             dfs = [test_sp]
 
         X_te = build_test_matrix(feat_names, *dfs)
-        probs_dict[name] = fit_predict_svm(X_tr, y_tr, X_te, folds=cv_folds)
+        probs_dict[name] = fit_predict_svm(X_tr, y_tr, X_te,
+                                           folds=cv_folds,
+                                           feature_names=feat_names)
 
     print_prediction_table(probs_dict)
 
