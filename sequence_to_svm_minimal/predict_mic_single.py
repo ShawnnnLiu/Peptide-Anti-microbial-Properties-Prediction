@@ -24,10 +24,20 @@ Usage
 -----
   conda run -n esm_env python predict_mic_single.py TRSSRAGLQWPVGRVHRLLRK
   conda run -n esm_env python predict_mic_single.py TRSSRAGLQWPVGRVHRLLRK --id BufParent
+
+  # Supply all 17 pre-computed StaPep features directly (skips DB lookup + BioPython):
+  conda run -n esm_env python predict_mic_single.py TRSSRAGLQWPVGRVHRLLRK --id BufNative \\
+    --full-features '{"length":21,"weight":2473.829,"hydrophobic_index":-0.8143,
+    "charge":6.094,"aromaticity":0.04762,"isoelectric_point":12.0,
+    "fraction_arginine":0.2381,"fraction_lysine":0.04762,"lyticity_index":300.106,
+    "helix_percent":0.0,"sheet_percent":0.0,"loop_percent":1.0,
+    "mean_bfactor":176.184,"mean_gyrate":18.249,"num_hbonds":0,
+    "psa":1137.781,"sasa":2334.656}'
 """
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import argparse
@@ -82,9 +92,9 @@ _EISEN = {"A": 0.62, "R": -2.53, "N": -0.78, "D": -0.90, "C": 0.29,
 
 STANDARD_AA = set("ACDEFGHIKLMNPQRSTVWY")
 
-BINS        = [0, 2, 10, np.inf]
-TIER_LABELS = ["Very strong (<2 μM)", "Moderate (2–10 μM)", "Weak (>10 μM)"]
-SHORT       = ["VeryStrong", "Moderate", "Weak"]
+BINS        = [0, 2, 5, 10, np.inf]
+TIER_LABELS = ["Very strong (<2 μM)", "Strong (2–5 μM)", "Moderate (5–10 μM)", "Weak (>10 μM)"]
+SHORT       = ["VeryStrong", "Strong", "Moderate", "Weak"]
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -163,25 +173,39 @@ def lookup_features(plain_seq: str, db: pd.DataFrame) -> pd.Series | None:
     return row
 
 
-def get_feature_row(raw_seq: str, db: pd.DataFrame) -> pd.DataFrame:
+def get_feature_row(raw_seq: str, db: pd.DataFrame,
+                    full_features: dict | None = None) -> pd.DataFrame:
     """
     Return a 1-row DataFrame of FEATURES for the query peptide.
-    Tries lookup first; falls back to BioPython + NaN for MD features.
+
+    Priority:
+      1. full_features dict supplied directly (e.g. from StaPep MD pipeline)
+      2. Exact sequence lookup in the feature database CSVs
+      3. BioPython sequence features + NaN for MD features (imputed)
     """
     plain = normalize_seq(raw_seq)
-    hit   = lookup_features(plain, db)
 
-    if hit is not None:
-        row = {f: hit.get(f, np.nan) for f in FEATURES}
-        source = "pre-computed"
+    if full_features is not None:
+        missing = [f for f in FEATURES if f not in full_features]
+        if missing:
+            print(f"  ⚠  --full-features missing keys: {missing}")
+            print(f"     Those will be NaN → imputed with training medians.")
+        row = {f: full_features.get(f, np.nan) for f in FEATURES}
+        source = "StaPep MD pipeline (all 17 features supplied)"
+        print(f"  ✅ Using supplied StaPep feature vector directly.")
     else:
-        print(f"  ⚠  Sequence not in feature database.")
-        print(f"     Computing sequence-level features via BioPython.")
-        print(f"     MD features (helix/sheet/loop/SASA/…) set to NaN")
-        print(f"     → imputed with training-set medians.\n")
-        row = {f: np.nan for f in FEATURES}
-        row.update(compute_seq_features(plain))
-        source = "BioPython (MD features imputed)"
+        hit = lookup_features(plain, db)
+        if hit is not None:
+            row = {f: hit.get(f, np.nan) for f in FEATURES}
+            source = "pre-computed"
+        else:
+            print(f"  ⚠  Sequence not in feature database.")
+            print(f"     Computing sequence-level features via BioPython.")
+            print(f"     MD features (helix/sheet/loop/SASA/…) set to NaN")
+            print(f"     → imputed with training-set medians.\n")
+            row = {f: np.nan for f in FEATURES}
+            row.update(compute_seq_features(plain))
+            source = "BioPython (MD features imputed)"
 
     df = pd.DataFrame([row])[FEATURES].astype(float)
     return df, source
@@ -217,7 +241,7 @@ def build_training() -> tuple[pd.DataFrame, pd.Series]:
                                / df["weight"].values[mask])
 
     df = df.dropna(subset=["mic_uM"] + FEATURES).reset_index(drop=True)
-    df["tier"] = pd.cut(df["mic_uM"], bins=BINS, labels=[0, 1, 2]).astype(int)
+    df["tier"] = pd.cut(df["mic_uM"], bins=BINS, labels=[0, 1, 2, 3]).astype(int)
     return df[FEATURES].astype(float), df["tier"]
 
 
@@ -307,11 +331,22 @@ def main():
                              "Non-standard residues and staple markers are stripped.")
     parser.add_argument("--id", default=None,
                         help="Label for the peptide (default: first 20 chars of sequence)")
+    parser.add_argument("--full-features", default=None, metavar="JSON",
+                        help="JSON string with all 17 pre-computed StaPep features. "
+                             "When supplied, skips DB lookup and BioPython fallback entirely.")
     args = parser.parse_args()
 
     raw_seq   = args.sequence.strip()
     plain_seq = normalize_seq(raw_seq)
     pep_id    = args.id or raw_seq[:20]
+
+    # Parse --full-features JSON if supplied
+    full_features = None
+    if args.full_features:
+        try:
+            full_features = json.loads(args.full_features)
+        except json.JSONDecodeError as e:
+            sys.exit(f"ERROR: --full-features is not valid JSON: {e}")
 
     if len(plain_seq) < 5:
         sys.exit(f"ERROR: sequence too short after normalisation: {plain_seq!r}")
@@ -330,7 +365,7 @@ def main():
 
     # ── Build feature row for query peptide ──────────────────────────────
     print("  Feature extraction …")
-    X_query, source = get_feature_row(raw_seq, db)
+    X_query, source = get_feature_row(raw_seq, db, full_features=full_features)
 
     # ── Build MIC training set ───────────────────────────────────────────
     print(f"  Feature source : {source}\n")
@@ -360,6 +395,8 @@ def main():
     print("\n" + "=" * 65)
     print("  MIC-Tier Predictions")
     print("=" * 65)
+    print(f"\n  Peptide  : {pep_id}")
+    print(f"  Sequence : {plain_seq}")
 
     print(f"\n  {'Model':<8}  {'Predicted Tier':<25}  "
           + "  ".join(f"{s:>10}" for s in SHORT))
