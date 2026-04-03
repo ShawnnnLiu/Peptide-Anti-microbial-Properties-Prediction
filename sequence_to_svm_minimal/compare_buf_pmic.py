@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
 compare_buf_pmic.py
-
+===================
 Side-by-side comparison of:
   LEFT  — Literature pMIC values for the 7 stapled Buforin variants
-          from the advisor's table (MIC in μg/mL, E. coli, corrected from mg/mL typo).
-  RIGHT — RF-predicted pMIC for our 4 Buforin variants
-          (Buf12, Buf13, Buf13_Q9K, Buf12_V15K_L19K) using StaPep MD features.
+           from the advisor's table (MIC in μg/mL, E. coli).
+  RIGHT — RF-predicted pMIC for the SAME 7 variants,
+           using StaPep MD features from buf_advisor_variants_features.csv.
 
-Note: The two sets are DIFFERENT staple-position variants of the same parent
-      Buforin II sequence, so this is a family-level comparison, not 1-to-1.
+The comparison is now 1-to-1: same variant appears in both panels.
 """
 
-import math, warnings
+import math
+import warnings
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -22,14 +22,22 @@ import matplotlib.patches as mpatches
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_predict, KFold
 from scipy import stats
+import re
 
 warnings.filterwarnings("ignore")
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
-DATA_DIR  = "data/training_dataset/StaPep"
-AMPS_META = f"{DATA_DIR}/stapled_amps.csv"
-AMPS_FEAT = f"{DATA_DIR}/stapled_amps_features.csv"
-TEST_FEAT = f"{DATA_DIR}/test_stapled_features.csv"
+import sys, os
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.join(_HERE, "..", "..")   # SVM_ESM_Peptides/
+
+DATA_DIR       = os.path.join(_HERE, "data", "training_dataset", "StaPep")
+AMPS_META      = os.path.join(DATA_DIR, "stapled_amps.csv")
+AMPS_FEAT      = os.path.join(DATA_DIR, "stapled_amps_features.csv")
+# Features from the new batch run (run_buf_variants_stapep.py)
+ADVISOR_FEAT   = os.path.join(_ROOT, "buf_advisor_variants_features.csv")
+# Fall back to old test file if new one not yet generated
+TEST_FEAT_OLD  = os.path.join(DATA_DIR, "test_stapled_features.csv")
 
 FEATURE_COLS = [
     "length", "weight", "hydrophobic_index", "charge", "aromaticity",
@@ -38,22 +46,23 @@ FEATURE_COLS = [
     "num_hbonds", "psa",
 ]
 
-# ─── Literature table (advisor's table, MIC corrected: mg/mL → μg/mL) ────────
-# Source: stapled Buforin variants tested against E. coli
-# pMIC = 6 - log10(MIC_uM)  where  MIC_uM = MIC_ugml * 1000 / MW_Da
+# ─── Advisor's table (7 variants, MIC in μg/mL — corrected from mg/mL typo) ──
+# pMIC = 6 − log10(MIC_μM)  where  MIC_μM = MIC_μg/mL × 1000 / MW_Da
+#
+# NOTE: Buf(i+7)1 has MIC >100 μg/mL → skip pMIC (shown as hatched bar)
 LITERATURE = [
-    # name,             MW_Da,   MIC_ugml (corrected),  hemo_pct (at 50 μg/mL)
-    ("Buf(i+4)16\n(F10W)", 2429.9, 5.2,   12.6),
-    ("Buf(i+4)14\n(F10W)", 2453.8, 29.2,   2.9),
-    ("Buf(i+4)4\n(F10W)",  2523.0, 100.0,  2.4),
-    ("Buf(i+4)3\n(F10W)",  2579.1, 6.3,    3.1),
-    ("Buf(i+7)9\n(F10W)",  2500.0, 3.1,   57.0),
-    ("Buf(i+7)6\n(F10W)",  2637.2, 22.9,   3.0),
-    ("Buf(i+7)1\n(F10W)",  2551.0, None,   2.3),  # >100, skip for pMIC
+    # (label,                   MW_Da,  MIC_μg/mL,  hemo_pct, stapep_id)
+    ("Buf(i+4)16\n(F10W)",  2429.9,   5.2,  12.6, "Buf_i4_16_F10W"),
+    ("Buf(i+4)14\n(F10W)",  2453.8,  29.2,   2.9, "Buf_i4_14_F10W"),
+    ("Buf(i+4)4\n(F10W)",   2523.0, 100.0,   2.4, "Buf_i4_4_F10W"),
+    ("Buf(i+4)3\n(F10W)",   2579.1,   6.3,   3.1, "Buf_i4_3_F10W"),
+    ("Buf(i+7)9\n(F10W)",   2500.0,   3.1,  57.0, "Buf_i7_9_F10W"),
+    ("Buf(i+7)6\n(F10W)",   2637.2,  22.9,   3.0, "Buf_i7_6_F10W"),
+    ("Buf(i+7)1\n(F10W)",   2551.0,  None,   2.3, "Buf_i7_1_F10W"),
 ]
 
+# ─── Helper: unit conversions ─────────────────────────────────────────────────
 def mic_ugml_to_pmic(mic_ugml, mw_da):
-    """Convert MIC in μg/mL to pMIC (= 6 - log10(MIC in μM))."""
     if mic_ugml is None:
         return None
     mic_uM = mic_ugml * 1000.0 / mw_da
@@ -77,47 +86,33 @@ TIER_COLORS = {
 }
 
 def bar_color(pmic):
-    return TIER_COLORS[tier(pmic)]
+    return TIER_COLORS.get(tier(pmic), "#bbbbbb")
 
-# ─── Native features ──────────────────────────────────────────────────────────
-NATIVE_FEAT = {
-    "length": 21, "weight": 2473.829, "hydrophobic_index": -0.8142857142857142,
-    "charge": 6.094, "aromaticity": 0.047619, "isoelectric_point": 11.9999,
-    "fraction_arginine": 0.23810, "fraction_lysine": 0.04762,
-    "helix_percent": 0.17819, "loop_percent": 0.82105,
-    "mean_bfactor": 573.434, "mean_gyrate": 12.001,
-    "num_hbonds": 0, "psa": 1064.217,
-}
-
-# ─── Train RF on full stapled AMP dataset ─────────────────────────────────────
+# ─── Train RF on stapled AMP dataset ─────────────────────────────────────────
 def load_and_train():
-    import re
-
     meta = pd.read_csv(AMPS_META)
     feat = pd.read_csv(AMPS_FEAT)
-    df   = pd.merge(meta[["DRAMP_ID","Target_Organism","Sequence"]],
+    df   = pd.merge(meta[["DRAMP_ID","Target_Organism"]],
                     feat[["DRAMP_ID"] + FEATURE_COLS],
                     on="DRAMP_ID", how="inner").dropna(subset=FEATURE_COLS)
 
-    _ECOLI_MIC_RE = re.compile(
-        r"(?:E\.?\s?coli|Escherichia\s+coli)(?:\s+ATCC\s+\d+)?\s*"
-        r"\(MIC(?:99\.9)?(?:[\d.]*)?\s*[=≥>]?\s*([\d.]+)\s*([μu]g/mL|[μu]M)\s*[,);]",
+    _ECOLI_RE = re.compile(
+        r"(?:E\.?\s?coli|Escherichia\s+coli)(?:\s+\w+)*\s*"
+        r"\(MIC(?:99\.9)?(?:[\d.]*)?\s*[=≥>]?\s*([\d.]+)\s*([μu]g/mL|[μu]M)",
         re.IGNORECASE,
     )
 
     def get_mic_uM(row):
-        text = str(row["Target_Organism"])
-        m    = _ECOLI_MIC_RE.search(text)
+        m = _ECOLI_RE.search(str(row["Target_Organism"]))
         if not m: return None
         v, u = float(m.group(1)), m.group(2).lower()
-        if u in ("μm","um"):      return v
+        if "um" in u or "μm" in u: return v
         mw = row.get("weight", 0)
-        if u in ("μg/ml","ug/ml") and mw > 0: return v / mw * 1000.0
-        return None
+        return (v / mw * 1000.0) if mw > 0 else None
 
-    df["mic_uM"]  = df.apply(get_mic_uM, axis=1)
+    df["mic_uM"] = df.apply(get_mic_uM, axis=1)
     df = df.dropna(subset=["mic_uM"])
-    df["pMIC"]    = 6 - np.log10(df["mic_uM"].clip(lower=1e-6))
+    df["pMIC"]   = 6 - np.log10(df["mic_uM"].clip(lower=1e-6))
 
     X = df[FEATURE_COLS].values.astype(float)
     y = df["pMIC"].values
@@ -125,172 +120,194 @@ def load_and_train():
     rf = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
     rf.fit(X, y)
 
-    # CV for R
     rf_cv = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
     cv    = KFold(n_splits=5, shuffle=True, random_state=42)
     y_cv  = cross_val_predict(rf_cv, X, y, cv=cv)
     r_cv, _ = stats.pearsonr(y, y_cv)
 
     print(f"  Training set: n={len(df)}  |  5-fold CV Pearson R = {r_cv:.3f}")
-    return rf, r_cv
+    return rf, r_cv, len(df)
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
-    print("=" * 65)
-    print("  Buforin pMIC: Literature vs. RF Model Predictions")
-    print("=" * 65)
+    print("=" * 70)
+    print("  Buforin Stapled Variants — Literature vs. RF Predicted pMIC")
+    print("=" * 70)
 
-    print("\n  Training RF model …")
-    rf, r_cv = load_and_train()
+    # ── Load RF model ─────────────────────────────────────────────────────────
+    print("\n  Training RF model on stapled AMP dataset …")
+    rf, r_cv, n_train = load_and_train()
 
-    # ── Literature pMIC ──────────────────────────────────────────────────────
-    lit_pmics = []
-    for name, mw, mic_ugml, hemo in LITERATURE:
-        pm = mic_ugml_to_pmic(mic_ugml, mw)
-        lit_pmics.append(pm)
+    # ── Load advisor variant features ─────────────────────────────────────────
+    if os.path.exists(ADVISOR_FEAT):
+        feat_df = pd.read_csv(ADVISOR_FEAT)
+        print(f"\n  Loaded advisor variant features: {ADVISOR_FEAT}")
+        print(f"  Variants found: {feat_df['peptide_id'].tolist()}")
+        source_note = "(StaPep MD features — same variants as literature)"
+    else:
+        print(f"\n  ⚠  {ADVISOR_FEAT} not found.")
+        print(f"     Run run_buf_variants_stapep.py first in WSL.")
+        print(f"     Falling back to old Buf12/Buf13 test variants …")
+        feat_df = pd.read_csv(TEST_FEAT_OLD)
+        source_note = "(old test variants — different staple positions)"
 
-    # ── Our model predictions ────────────────────────────────────────────────
-    test = pd.read_csv(TEST_FEAT).dropna(subset=FEATURE_COLS)
-    buf_test = test[test["peptide_id"].str.lower().str.startswith("buf")]
+    # ── Compute predictions for each literature variant ───────────────────────
+    lit_label, lit_mw, lit_mic, lit_hemo, lit_ids = zip(*[
+        (r[0], r[1], r[2], r[3], r[4]) for r in LITERATURE
+    ])
 
-    our_labels = ["Buforin II\n(native)"] + buf_test["peptide_id"].tolist()
-    our_weights = [NATIVE_FEAT["weight"]] + buf_test["weight"].tolist()
+    lit_pmics = [mic_ugml_to_pmic(m, mw) for m, mw in zip(lit_mic, lit_mw)]
 
-    our_Xs = [np.array([[NATIVE_FEAT[f] for f in FEATURE_COLS]])]
-    for _, row in buf_test.iterrows():
-        our_Xs.append(np.array([[row[f] for f in FEATURE_COLS]]))
+    pred_pmics = []
+    for pid in lit_ids:
+        row = feat_df[feat_df["peptide_id"] == pid]
+        if row.empty or row[FEATURE_COLS].isnull().any(axis=1).all():
+            pred_pmics.append(None)
+        else:
+            x   = np.array([[row.iloc[0][f] for f in FEATURE_COLS]])
+            pred_pmics.append(float(rf.predict(x)[0]))
 
-    our_pmics = [float(rf.predict(x)[0]) for x in our_Xs]
+    # ── Print table ───────────────────────────────────────────────────────────
+    print("\n" + "─" * 80)
+    print(f"  {'Peptide':<22}  {'Lit MIC μg/mL':>13}  {'Lit μM':>7}  {'Lit pMIC':>8}  "
+          f"{'Pred pMIC':>9}  {'Pred MIC μg/mL':>14}")
+    print("  " + "─" * 76)
 
-    # ── Print table ──────────────────────────────────────────────────────────
-    print("\n  ── Literature (from advisor's table, corrected to μg/mL) ──")
-    print(f"  {'Peptide':<22}  {'MIC μg/mL':>10}  {'MIC μM':>8}  {'pMIC':>6}  Tier")
-    print("  " + "─" * 60)
-    for (name, mw, mic_ugml, hemo), pm in zip(LITERATURE, lit_pmics):
-        tag   = ">100 μg/mL" if mic_ugml is None else f"{mic_ugml:.1f}"
-        mic_v = f"{mic_ugml*1000/mw:.2f}" if mic_ugml else "—"
-        pm_s  = f"{pm:.3f}" if pm else "—"
-        t     = tier(pm) if pm else "—"
-        print(f"  {name.replace(chr(10),' '):<22}  {tag:>10}  {mic_v:>8}  {pm_s:>6}  {t}")
+    for label, mw, mic_ugml, hemo, pid, lpm, ppm in zip(
+            lit_label, lit_mw, lit_mic, lit_hemo,
+            lit_ids, lit_pmics, pred_pmics):
+        lname  = label.replace("\n", " ")
+        mic_s  = f"{mic_ugml:.1f}" if mic_ugml else ">100"
+        mic_um = f"{mic_ugml*1000/mw:.2f}" if mic_ugml else "—"
+        lpm_s  = f"{lpm:.3f}" if lpm else "—"
+        if ppm is not None:
+            pmic_uM   = pmic_to_mic_uM(ppm)
+            pmic_ugml = pmic_uM * mw / 1000.0
+            ppm_s     = f"{ppm:.3f}"
+            p_ugml_s  = f"{pmic_ugml:.1f} μg/mL"
+        else:
+            ppm_s    = "N/A (no MD)"
+            p_ugml_s = "—"
+        print(f"  {lname:<22}  {mic_s:>13}  {mic_um:>7}  {lpm_s:>8}  "
+              f"{ppm_s:>9}  {p_ugml_s:>14}")
 
-    print("\n  ── RF Model Predictions (our 4 Buf test variants) ──")
-    print(f"  {'Peptide':<24}  {'pMIC':>6}  {'MIC μM':>8}  {'MIC μg/mL':>10}  Tier")
-    print("  " + "─" * 62)
-    for lab, pm, mw in zip(our_labels, our_pmics, our_weights):
-        mic_uM   = pmic_to_mic_uM(pm)
-        mic_ugml = mic_uM * mw / 1000.0
-        t = tier(pm)
-        print(f"  {lab.replace(chr(10),' '):<24}  {pm:.3f}  {mic_uM:>8.2f}  {mic_ugml:>10.2f}  {t}")
+    print("  " + "─" * 76)
+    print("\n  ⚠  All units: MIC in μg/mL (corrected from mg/mL typo in original table)")
 
     # ── Figure ────────────────────────────────────────────────────────────────
-    fig, (ax_lit, ax_our) = plt.subplots(1, 2, figsize=(15, 6),
-                                          gridspec_kw={"wspace": 0.42})
+    n_rows = len(LITERATURE)
+    fig, (ax_lit, ax_pred) = plt.subplots(1, 2, figsize=(16, 6),
+                                           gridspec_kw={"wspace": 0.38})
 
-    # ── Panel A: Literature ───────────────────────────────────────────────────
-    lit_names  = [r[0] for r in LITERATURE]
-    lit_hemo   = [r[3] for r in LITERATURE]
-    valid_lit  = [(i, pm) for i, pm in enumerate(lit_pmics) if pm is not None]
-    invalid_li = [i for i, pm in enumerate(lit_pmics) if pm is None]
+    y_pos  = np.arange(n_rows)
+    x_lo, x_hi = 3.8, 6.5
 
-    y_pos = np.arange(len(LITERATURE))
-    colors_lit = [bar_color(pm) if pm else "#bbbbbb" for pm in lit_pmics]
-    bars_lit = ax_lit.barh(y_pos, [pm if pm else 4.3 for pm in lit_pmics],
-                            color=colors_lit, edgecolor="black", linewidth=0.7,
-                            height=0.55)
+    # Tier reference lines helper
+    def add_tier_lines(ax):
+        for mic_thresh, lbl in [(2, "2 μM"), (5, "5 μM"), (10, "10 μM")]:
+            pm_line = 6 - math.log10(mic_thresh)
+            ax.axvline(pm_line, color="gray", lw=0.8, ls="--", alpha=0.6)
+            ax.text(pm_line, -0.65, lbl, ha="center", fontsize=7, color="gray")
 
-    # Mark >100 bar with arrow
-    for i in invalid_li:
-        bars_lit[i].set_hatch("///")
-        ax_lit.text(4.35, i, "  >100 μg/mL\n  (>pMIC 4.4)", va="center",
-                    fontsize=7.5, color="#555")
+    # ── Panel A — Literature ──────────────────────────────────────────────────
+    colors_lit  = [bar_color(pm) if pm else "#cccccc" for pm in lit_pmics]
+    vals_lit    = [pm if pm else 4.2 for pm in lit_pmics]
+    bars_a = ax_lit.barh(y_pos, vals_lit, color=colors_lit,
+                          edgecolor="black", linewidth=0.7, height=0.55)
 
-    for i, pm in valid_lit:
-        mw       = LITERATURE[i][1]
-        mic_ugml = LITERATURE[i][2]
-        mic_uM   = mic_ugml * 1000 / mw
-        hemo     = lit_hemo[i]
-        ax_lit.text(pm + 0.02, i,
-                    f"  {pm:.2f}  ({mic_ugml:.1f} μg/mL / {mic_uM:.2f} μM)"
-                    f"  |  {hemo:.0f}% hem.",
-                    va="center", fontsize=7.5)
+    for i, (pm, mw, mic_ugml, hemo) in enumerate(zip(lit_pmics, lit_mw, lit_mic, lit_hemo)):
+        if pm is None:
+            bars_a[i].set_hatch("///")
+            ax_lit.text(4.25, i, "  >100 μg/mL", va="center", fontsize=7.5, color="#555")
+        else:
+            mic_uM = mic_ugml * 1000 / mw
+            ax_lit.text(pm + 0.02, i,
+                        f"  {pm:.2f}  ({mic_ugml:.1f} μg/mL / {mic_uM:.2f} μM)"
+                        f"  |  {hemo:.0f}% hem.",
+                        va="center", fontsize=7)
 
     ax_lit.set_yticks(y_pos)
-    ax_lit.set_yticklabels(lit_names, fontsize=8.5)
+    ax_lit.set_yticklabels(list(lit_label), fontsize=8.5)
     ax_lit.invert_yaxis()
-    ax_lit.set_xlim(4.0, 6.5)
+    ax_lit.set_xlim(x_lo, x_hi)
     ax_lit.set_xlabel("pMIC  (= 6 − log₁₀[MIC in μM])", fontsize=10)
-    ax_lit.set_title("Panel A — Literature Values\n(Advisor's table, μg/mL corrected)",
+    ax_lit.set_title("Panel A — Literature Values\n(Advisor's table, μg/mL)",
                      fontsize=10, fontweight="bold")
+    add_tier_lines(ax_lit)
 
-    # Tier reference lines
-    for mic_thresh, label in [(2, "2 μM"), (5, "5 μM"), (10, "10 μM")]:
-        pm_line = 6 - math.log10(mic_thresh)
-        ax_lit.axvline(pm_line, color="gray", lw=0.8, ls="--", alpha=0.6)
-        ax_lit.text(pm_line, -0.6, label, ha="center", fontsize=7, color="gray")
-
-    # Annotate staple type groups
+    # i+4 / i+7 group divider
     ax_lit.axhline(3.5, color="#555", lw=0.8, ls=":")
-    ax_lit.text(4.02, 1.5, "i+4 staples", fontsize=7.5, color="#333",
+    ax_lit.text(x_lo + 0.05, 1.5, "i+4 staples", fontsize=7.5, color="#333",
                 style="italic", va="center")
-    ax_lit.text(4.02, 5.0, "i+7 staples", fontsize=7.5, color="#333",
+    ax_lit.text(x_lo + 0.05, 5.0, "i+7 staples", fontsize=7.5, color="#333",
                 style="italic", va="center")
 
-    # ── Panel B: Our RF predictions ───────────────────────────────────────────
-    y_pos2   = np.arange(len(our_labels))
-    our_cols = [bar_color(pm) for pm in our_pmics]
-    hatches  = ["///" if "native" in l.lower() else "" for l in our_labels]
+    # ── Panel B — RF Predictions ──────────────────────────────────────────────
+    colors_pred = [bar_color(pm) if pm else "#cccccc" for pm in pred_pmics]
+    vals_pred   = [pm if pm else 4.2 for pm in pred_pmics]
+    bars_b = ax_pred.barh(y_pos, vals_pred, color=colors_pred,
+                           edgecolor="black", linewidth=0.7, height=0.55)
 
-    bars2 = ax_our.barh(y_pos2, our_pmics, color=our_cols,
-                         edgecolor="black", linewidth=0.7, height=0.55)
-    for bar, h in zip(bars2, hatches):
-        if h: bar.set_hatch(h)
+    for i, (pm, mw) in enumerate(zip(pred_pmics, lit_mw)):
+        if pm is None:
+            bars_b[i].set_hatch("///")
+            ax_pred.text(4.25, i, "  MD features not yet run",
+                         va="center", fontsize=7.5, color="#999")
+        else:
+            mic_uM   = pmic_to_mic_uM(pm)
+            mic_ugml = mic_uM * mw / 1000.0
+            ax_pred.text(pm + 0.02, i,
+                         f"  {pm:.2f}  ({mic_uM:.2f} μM / {mic_ugml:.1f} μg/mL)",
+                         va="center", fontsize=7)
 
-    for i, (pm, mw, lab) in enumerate(zip(our_pmics, our_weights, our_labels)):
-        mic_uM   = pmic_to_mic_uM(pm)
-        mic_ugml = mic_uM * mw / 1000.0
-        ax_our.text(pm + 0.02, i,
-                    f"  {pm:.2f}  ({mic_uM:.2f} μM / {mic_ugml:.1f} μg/mL)",
-                    va="center", fontsize=7.5)
-
-    ax_our.set_yticks(y_pos2)
-    ax_our.set_yticklabels(our_labels, fontsize=8.5)
-    ax_our.invert_yaxis()
-    ax_our.set_xlim(4.0, 6.5)
-    ax_our.set_xlabel("Predicted pMIC  (= 6 − log₁₀[MIC in μM])", fontsize=10)
-    ax_our.set_title(f"Panel B — RF Model Predictions\n"
-                     f"(5-fold CV Pearson R = {r_cv:.2f}, our Buf variants)",
-                     fontsize=10, fontweight="bold")
-
-    for mic_thresh, label in [(2, "2 μM"), (5, "5 μM"), (10, "10 μM")]:
-        pm_line = 6 - math.log10(mic_thresh)
-        ax_our.axvline(pm_line, color="gray", lw=0.8, ls="--", alpha=0.6)
-        ax_our.text(pm_line, -0.6, label, ha="center", fontsize=7, color="gray")
+    ax_pred.set_yticks(y_pos)
+    ax_pred.set_yticklabels(list(lit_label), fontsize=8.5)
+    ax_pred.invert_yaxis()
+    ax_pred.set_xlim(x_lo, x_hi)
+    ax_pred.set_xlabel("Predicted pMIC  (= 6 − log₁₀[MIC in μM])", fontsize=10)
+    ax_pred.set_title(f"Panel B — RF Model Predictions {source_note}\n"
+                      f"(Trained on {n_train} stapled AMPs,  5-fold CV R = {r_cv:.2f})",
+                      fontsize=9, fontweight="bold")
+    add_tier_lines(ax_pred)
+    ax_pred.axhline(3.5, color="#555", lw=0.8, ls=":")
+    ax_pred.text(x_lo + 0.05, 1.5, "i+4 staples", fontsize=7.5, color="#333",
+                 style="italic", va="center")
+    ax_pred.text(x_lo + 0.05, 5.0, "i+7 staples", fontsize=7.5, color="#333",
+                 style="italic", va="center")
 
     # ── Shared legend ─────────────────────────────────────────────────────────
-    tier_patches = [mpatches.Patch(color=c, label=f"{t} (MIC: {m})")
-                    for t, (c, m) in {
-                        "Very Strong": ("#1a9641", "<2 μM"),
-                        "Strong":      ("#a6d96a", "2–5 μM"),
-                        "Moderate":    ("#fdae61", "5–10 μM"),
-                        "Weak":        ("#d7191c", ">10 μM"),
-                    }.items()]
-    tier_patches.append(mpatches.Patch(facecolor="white", edgecolor="#333",
-                                        hatch="///", label="Non-stapled / native"))
+    tier_patches = [
+        mpatches.Patch(color="#1a9641", label="Very Strong  (<2 μM)"),
+        mpatches.Patch(color="#a6d96a", label="Strong  (2–5 μM)"),
+        mpatches.Patch(color="#fdae61", label="Moderate  (5–10 μM)"),
+        mpatches.Patch(color="#d7191c", label="Weak  (>10 μM)"),
+        mpatches.Patch(facecolor="white", edgecolor="#333",
+                       hatch="///", label=">100 μg/mL / no MD run"),
+    ]
     fig.legend(handles=tier_patches, loc="lower center", ncol=5, fontsize=8.5,
                bbox_to_anchor=(0.5, -0.04), framealpha=0.9,
                title="MIC Tier Color Code", title_fontsize=8.5)
 
     fig.suptitle(
-        "Buforin Stapled Variants — Literature MIC vs. RF-Predicted pMIC\n"
-        "Note: Panel A and B are DIFFERENT staple-position variants of the same parent "
-        "Buforin II sequence\n(F10W mutation present in literature variants)",
-        fontsize=9.5, fontweight="bold",
+        "Buforin Stapled Variants (F10W) — Literature MIC vs. RF-Predicted pMIC\n"
+        "Same variants in both panels  |  MIC units: μg/mL  |  E. coli",
+        fontsize=10, fontweight="bold",
     )
 
     out = "buforin_pmic_comparison.png"
     plt.savefig(out, dpi=180, bbox_inches="tight")
     plt.close()
     print(f"\n  Figure saved → {out}")
+
+    # ── Pearson R between lit and predicted (for variants with both) ──────────
+    paired = [(l, p) for l, p in zip(lit_pmics, pred_pmics) if l and p]
+    if len(paired) >= 3:
+        l_arr = np.array([x[0] for x in paired])
+        p_arr = np.array([x[1] for x in paired])
+        r_lit_pred, _ = stats.pearsonr(l_arr, p_arr)
+        print(f"\n  Pearson R (literature pMIC vs. predicted pMIC) = {r_lit_pred:.3f}")
+        print(f"  Based on {len(paired)} variants with both literature MIC and MD features")
+
     print("  Done.\n")
 
 
