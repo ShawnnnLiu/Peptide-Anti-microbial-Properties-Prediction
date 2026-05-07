@@ -1,0 +1,41 @@
+StaPep / MD feature coverage — summary for advisor
+Reference: J. Med. Chem. PMID 31427820 (stapled magainin-family peptides in DRAMP)
+
+File state (StaPep/ folder)
+  stapled_amps.csv                                  — unmodified DRAMP export (188 rows); no PAPER_* rows.
+  stapled_amps_features.csv                         — unmodified StaPep feature table keyed to DRAMP IDs.
+  stapled_amps_paper_supplement.csv                 — 7 new rows added (PAPER_31427820_*) for 1,15 multi-mutants
+                                                       beyond A9K; identity + DRAMP-style text only.
+  stapled_amps_paper_supplement_features.csv        — descriptor table for the 7 new rows.
+                                                       Sequence-only columns are filled
+                                                       (length, weight, charge, aromaticity, isoelectric_point,
+                                                        fraction_arginine, fraction_lysine, lyticity_index).
+                                                       MD columns (helix_percent, sheet_percent, loop_percent,
+                                                        mean_bfactor, mean_gyrate, num_hbonds, psa, sasa)
+                                                       are BLANK — full MD run still required.
+  stapled_amps_combined_paper_dataset.csv           — merged: DRAMP + 7 PAPER rows.
+  stapled_amps_features_combined_paper_dataset.csv  — merged feature table: DRAMP rows have full features;
+                                                       7 PAPER rows have MD columns BLANK.
+
+What does NOT need new feature work (fully covered)
+  • All 37 paper-extraction-sheet peptides that map 1:1 to a DRAMP_ID.
+    Their StaPep descriptors and MD columns are already in stapled_amps_features.csv.
+  • Four-species figure: Pleu/CAP/Mag/Esc → DRAMP21540–21543.
+  • Mag(i+7)1 … Mag(i+7)14 → DRAMP21544–21557.
+
+What DOES still need feature work
+  1) MD run for the 7 PAPER_31427820_* supplement rows.
+     Command (WSL / env with StaPep):
+       python run_amp_md_features.py \
+         --amp-csv stapled_amps_paper_supplement.csv \
+         --out    stapled_amps_paper_supplement_features.csv
+     Then re-run combine_stapled_paper_dataset.py to refresh the combined feature CSV.
+  2) (Optional) Magainin II linear parent (GIGKFLHSAKKFGKAFVGEIMNS) is not a standalone row
+     anywhere in our pipeline. Only add it if we want an unstapled parent in training.
+
+Bottom line
+  The 45-peptide paper extraction splits into 37 already-covered rows, 7 PAPER_* rows that
+  still need their MD columns computed (sequence-only descriptors already present), and
+  1 linear parent that is optional. Most peptides in the paper figures therefore do not
+  require any manual figure re-extraction for StaPep features; the DRAMP text already
+  carries MIC and hemolysis, and the feature pipeline already produced the descriptors.

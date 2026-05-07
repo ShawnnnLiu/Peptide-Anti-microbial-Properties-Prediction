@@ -96,8 +96,9 @@ TEST_PEPTIDES = [
 
 OUT_CSV  = SCRIPT_DIR / "test_stapled_features.csv"
 MD_DIR   = SCRIPT_DIR / "structures" / "TEST_MD"
-MD_NSTEPS    = 250_000
-MD_INTERVAL  = 2_500
+# Match run_amp_md_features.py defaults (2M steps → 4 ns, ~100 frames)
+MD_NSTEPS    = 2_000_000
+MD_INTERVAL  = MD_NSTEPS // 100
 MD_TIMESTEP  = 2          # fs
 MD_TEMP      = 300        # K
 MD_FRICTION  = 1.0        # ps⁻¹

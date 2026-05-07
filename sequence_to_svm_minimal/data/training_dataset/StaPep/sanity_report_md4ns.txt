@@ -1,0 +1,89 @@
+
+========================================================================
+  StaPep MD sanity report  (stapled_amps_features_training_XZ_md4ns.csv)
+========================================================================
+
+========================================================================
+  1. Internal consistency
+========================================================================
+  Rows: 172
+  helix+sheet+loop within 0.01 of 1.0: 172/172
+  helix_percent >=0,<=1 OK (172/172)
+  sheet_percent >=0,<=1 OK (172/172)
+  loop_percent >=0,<=1 OK (172/172)
+  mean_bfactor >=0 OK (172/172)
+  mean_gyrate >0 OK (172/172)
+  num_hbonds >=0 OK (172/172)
+  psa >0 OK (172/172)
+  sasa >0 OK (172/172)
+  mean_gyrate / (2.2 * sqrt(length))  median=1.03 5%=0.85  95%=1.25  (target ~1.0; <0.7 collapsed, >1.4 extended)
+
+========================================================================
+  2. Distributional sanity
+========================================================================
+  Per-feature stats (4 ns MD, n=172):
+                         mean      std      min       max
+  length               17.797    7.077    7.000    32.000
+  weight             2027.431  714.835  862.076  3853.771
+  hydrophobic_index     0.215    0.569   -1.186     2.238
+  charge                5.021    2.344   -2.900    13.995
+  aromaticity           0.101    0.067    0.000     0.429
+  isoelectric_point    10.266    1.088    4.352    12.000
+  fraction_arginine     0.022    0.075    0.000     0.429
+  fraction_lysine       0.262    0.124    0.000     0.571
+  lyticity_index      494.791  192.547  135.566   948.965
+  helix_percent         0.090    0.089    0.000     0.338
+  sheet_percent         0.012    0.022    0.000     0.117
+  loop_percent          0.898    0.087    0.662     1.000
+  mean_bfactor        334.944  267.846    4.942  1219.071
+  mean_gyrate           9.350    2.065    6.068    18.268
+  num_hbonds            0.767    0.951    0.000     4.000
+  psa                 745.674  278.342  307.022  1632.646
+  sasa               1695.946  532.613  808.715  3447.248
+  [WARN] Mean helix_percent = 0.090. Stapled AMPs in literature typically show 0.30-0.80. Consider checking whether 4 ns is long enough to refold from the linear starting structure, or whether DSSP cutoff in StaPep is strict.
+  
+  AMP vs Decoy mean (separation should be visible for charge / fraction_lysine / helix_percent / lyticity_index):
+    feature                      AMP     decoy   |delta|/sigma
+    helix_percent              0.090     0.416            2.63
+    sheet_percent              0.012     0.000            1.06
+    loop_percent               0.898     0.584            2.55
+    mean_bfactor             334.944   214.551            0.53
+    mean_gyrate                9.350     9.574            0.10
+    num_hbonds                 0.767     3.406            1.48
+    psa                      745.674   873.651            0.40
+    sasa                    1695.946  1697.088            0.00
+    charge                     5.021     1.093            1.29
+    fraction_lysine            0.262     0.070            1.75
+    lyticity_index           494.791   672.178            0.80
+  
+  +/-3 sigma outliers in any MD feature: 11
+    -> c:\Users\bioin\Documents\SVM_ESM_Peptides\Peptide-Anti-microbial-Properties-Prediction\sequence_to_svm_minimal\data\training_dataset\StaPep\sanity_outliers_md4ns.csv
+
+========================================================================
+  3. Drift vs legacy stapled_amps_features.csv
+========================================================================
+  Overlapping DRAMP_IDs (training vs legacy): 165
+  
+  Per-feature drift (positive = 4 ns larger than legacy):
+        feature  n_overlap  mean_delta_4ns_minus_legacy  median_delta  std_delta  max_abs_delta
+  helix_percent        165                       0.0615        0.0353     0.0889         0.2982
+  sheet_percent        165                       0.0052        0.0000     0.0212         0.1117
+   loop_percent        165                      -0.0666       -0.0504     0.0895         0.2982
+   mean_bfactor        165                      42.2728       11.6257   174.7930       755.2404
+    mean_gyrate        165                      -1.4303       -0.9717     1.8921         7.8825
+     num_hbonds        165                       0.0606        0.0000     1.0282         3.0000
+            psa        165                     -12.8702      -11.5902    19.6640        77.2229
+           sasa        165                    -105.9482      -93.0987   115.8990       433.9445
+    per-peptide delta table -> c:\Users\bioin\Documents\SVM_ESM_Peptides\Peptide-Anti-microbial-Properties-Prediction\sequence_to_svm_minimal\data\training_dataset\StaPep\sanity_legacy_vs_md4ns.csv
+
+========================================================================
+  Recommended next manual checks
+========================================================================
+  * CD-helicity comparison: cross-check predicted helix_percent against
+    experimental %helicity for Mag(i+4)1,15(A9K), Pleu(i+4)1,15(A9K),
+    CAP(i+4)1,23(L17K), Esc(i+4)1,14(A7K) from PMID 31427820 Table 1.
+  * Replicate-MD: re-run 3-5 random peptides with a different OpenMM seed;
+    if helix_percent drifts > 0.10 between replicates the single-trajectory
+    features are too noisy to use as regression labels.
+  * Trajectory eyeball: load /tmp/stapep_md/<DRAMP_ID>/{pep_vac.prmtop,traj.dcd}
+    in pytraj/VMD for any +/-3 sigma outlier and confirm no obvious chain break.

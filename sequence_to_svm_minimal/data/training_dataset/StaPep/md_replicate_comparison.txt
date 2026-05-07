@@ -1,0 +1,41 @@
+==============================================================================
+  MD reproducibility — replicate 2 vs replicate 1
+==============================================================================
+  Replicates compared: rep1 = stapled_amps_features_training_XZ_md4ns.csv
+                       rep2 = stapled_amps_features_training_XZ_md4ns_REP2.csv
+  Common DRAMP_IDs   : 3  (DRAMP21541, DRAMP21542, DRAMP21558)
+  Per-peptide delta CSV -> /mnt/c/Users/bioin/Documents/SVM_ESM_Peptides/Peptide-Anti-microbial-Properties-Prediction/sequence_to_svm_minimal/data/training_dataset/StaPep/md_replicate_comparison.csv
+
+Per-feature noise summary across the 3 peptides:
+  feature             mean(|delta|)   max(|delta|)    mean(rep1)   noise/signal
+  helix_percent              0.0206         0.0446         0.090          0.229
+  sheet_percent              0.0016         0.0030         0.002          0.939
+  loop_percent               0.0202         0.0463         0.908          0.022
+  mean_bfactor             177.6683       410.7680       392.163          0.453
+  mean_gyrate                0.5546         1.0726        11.683          0.047
+  num_hbonds                 0.6667         2.0000         1.000          0.667
+  psa                       18.4796        25.6141       981.910          0.019
+  sasa                      38.2974        62.9542      2137.014          0.018
+
+Per-peptide MD-feature deltas (rep2 - rep1):
+  feature     helix_percent  sheet_percent  loop_percent  mean_bfactor  mean_gyrate  num_hbonds      psa     sasa
+  DRAMP_ID                                                                                                       
+  DRAMP21541        -0.0173         0.0030        0.0142      109.1091      -0.3755        -2.0  25.6141 -62.9542
+  DRAMP21542         0.0446         0.0017       -0.0463      410.7680       1.0726         0.0 -22.9540  39.8898
+  DRAMP21558         0.0000         0.0000        0.0000      -13.1278       0.2159         0.0   6.8707  12.0482
+
+Sequence-only features (should be identical across replicates):
+  length                  max |delta| across 3 peptides = 0.0
+  weight                  max |delta| across 3 peptides = 0.0
+  hydrophobic_index       max |delta| across 3 peptides = 0.0
+  charge                  max |delta| across 3 peptides = 0.0
+  isoelectric_point       max |delta| across 3 peptides = 0.0
+  lyticity_index          max |delta| across 3 peptides = 0.0
+
+Interpretation guide:
+  * mean |delta| / mean(rep1) is the rough fractional noise floor.
+    Values < 0.05 mean the feature is reproducible at the per-peptide level.
+    Values 0.05-0.20 mean cohort-level statistics are reliable but per-peptide
+    labels are noisy; use as ranked features, not absolute values.
+    Values > 0.20 mean a single trajectory does not pin the feature down;
+    consider triplicate-and-average or longer MD before using as regression label.
