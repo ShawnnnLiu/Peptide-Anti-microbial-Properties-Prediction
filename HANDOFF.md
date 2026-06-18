@@ -90,6 +90,16 @@ ESMFold cache (~15 GB), MIC datasets, and all notebooks. A fresh clone must rege
 these. The DBAASP large MIC dataset (~20k peptides) was planned but never obtained — a
 long-standing blocker for general MIC regression.
 
+**Re-downloading the ESMFold weights:** use
+`sequence_to_svm_minimal/models/download_from_huggingface.py` — it pulls
+`facebook/esmfold_v1` (~8.44 GB) from **Hugging Face** into `~/.cache/huggingface/` via
+`huggingface_hub.hf_hub_download` (resumable). Use this one — the **direct Meta download is
+unreliable / broken**, which is why this HF fallback exists. Run:
+`cd sequence_to_svm_minimal && python models/download_from_huggingface.py`. It loads via
+`transformers` (`EsmForProteinFolding.from_pretrained('facebook/esmfold_v1')`), not `fair-esm`.
+(The sibling scripts `models/download_esmfold.py` / `download_esmfold_simple.py` are the
+Meta/torch-hub route — avoid.)
+
 ---
 
 ## 3. Environment setup
@@ -132,6 +142,43 @@ are persisted.
 | `build_geometric_features.py` | General PDB-dir → geometric CSV (argparse) | `python build_geometric_features.py --pdb-dir ... --output ...` |
 | `extract_stapep_qsar.py` | 12 QSAR descriptors (run under `skl_legacy`) | `python extract_stapep_qsar.py` |
 | `features/geometric_features.py` | **Library** computing all geometric features from a PDB (the engine behind the builders) | imported |
+
+#### Input formats (non-obvious gotcha)
+The feature builders do **not** all take the same input, and "plaintext" means *canonical
+single-letter sequences* — not arbitrary letters.
+
+- **ESMFold / geometric + QSAR builders** (`generate_stapep_structures.py`,
+  `build_geometric_features.py`, `extract_stapep_qsar.py`) read **plaintext `.txt` (one
+  sequence per line) or FASTA**, e.g.:
+  ```
+  KFFKKLKKAVKKGFKKFAKV
+  KKKKKKAAFAWAFAA
+  ```
+  Constraints: **only the 20 canonical amino acids** (`O`/pyrrolysine, `U`/selenocysteine,
+  etc. will fail), and **staple positions are flattened to their parent canonical residue** —
+  this is the `Hiden_Sequence` / `Original_Sequence`, *not* the staple-marked `Sequence`. So
+  the structure/QSAR features see an *approximation* of the stapled peptide, blind to the
+  actual staple chemistry.
+
+- **StaPep MD feature builder** (`data/training_dataset/StaPep/extract_amp_features.py` →
+  `stapled_amps_features.csv`) does **not** take bare plaintext. It reads a **CSV**
+  (`stapled_amps.csv`) with `Hiden_Sequence` + `N_terminal_Modification` +
+  `C_terminal_Modification` columns, then `build_stapep_seq()` builds a StaPep-specific string
+  that **encodes the non-standard residues** before handing it to `ProtParamsSeq()`:
+
+  | Token | Meaning |
+  |---|---|
+  | `X` | S5 staple residue (pentenyl) |
+  | `Z` → `R8` | R8 olefin staple residue (octenyl) |
+  | `J` → `B` | norleucine |
+  | `Ac` prefix | N-terminal acetylation |
+  | `NH2` suffix | C-terminal amidation |
+
+  e.g. `KFFKKLKKAVKKGFKKFAKVNH2`, or with staples `Ac...X...X...NH2`. This is the only path
+  that is staple-aware.
+
+**Takeaway:** if you feed a new stapled peptide, the ESMFold/QSAR side only ever sees the
+canonical backbone; only the StaPep MD pipeline captures the staple.
 
 ### 4b. Classification training
 **Legacy SVM (inference only):**
