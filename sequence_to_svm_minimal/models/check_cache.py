@@ -2,12 +2,17 @@
 Check what ESMFold files have been downloaded so far
 """
 
+import sys
 from pathlib import Path
+
+# Make utils/ importable regardless of cwd
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.paths import TORCH_HUB_CHECKPOINTS
 
 
 def check_cache():
     """Check ESMFold cache status"""
-    cache_dir = Path.home() / ".cache" / "torch" / "hub" / "checkpoints"
+    cache_dir = TORCH_HUB_CHECKPOINTS
     
     print("=" * 60)
     print("  ESMFold Cache Status")

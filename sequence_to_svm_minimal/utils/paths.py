@@ -23,9 +23,22 @@ STRUCTURES_DIR  = DATA_DIR / "structures"
 DESCRIPTORS_DIR = PROJECT_ROOT / "descriptors"
 AAINDEX_DIR     = DESCRIPTORS_DIR / "aaindex"
 
+# ESMFold / ESM-2 driver scripts and their (optional) local model checkpoint.
+# The scripts fall back to a HuggingFace download when this dir is absent; it
+# does not currently exist in the tree. Sourced here so the three ESMFold
+# drivers agree on one location regardless of where each script lives.
+MODELS_DIR         = PROJECT_ROOT / "models"
+ESMFOLD_LOCAL_DIR  = MODELS_DIR / "esmfold_v1_local"
+
 # Output destinations
 RESULTS_DIR  = PROJECT_ROOT / "results"
 FIGURES_DIR  = PROJECT_ROOT / "figures"
+
+# External model caches (NOT project-managed — user-home caches shared by the
+# ESMFold download/diagnostic tools). Centralized so those tools agree on the
+# path instead of each hardcoding ``Path.home() / ".cache" / ...``.
+TORCH_HUB_CHECKPOINTS = Path.home() / ".cache" / "torch" / "hub" / "checkpoints"
+HF_CACHE              = Path.home() / ".cache" / "huggingface"
 
 # Pre-trained 2016 PNAS SVM bundle. The live svm/ scripts read from the
 # frozen snapshot copy under pretrained_svm/, not the live predictionsParameters/.

@@ -22,6 +22,11 @@ import pandas as pd
 import torch
 from tqdm import tqdm
 
+# Make utils/ importable regardless of cwd
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.paths import ESMFOLD_LOCAL_DIR
+from utils.sequence_io import parse_sequence_file
+
 
 def load_checkpoint(checkpoint_file):
     """Load progress checkpoint if it exists"""
@@ -43,34 +48,6 @@ def save_checkpoint(checkpoint_file, checkpoint_data):
         json.dump(checkpoint_data, f, indent=2)
 
 
-def parse_sequence_file(input_file):
-    """
-    Parse sequence file in SVM format:
-    1 MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPN
-    2 GVVDSDDLPLVVAASNAGKSTVVQLLAAAG
-    
-    Returns list of (index, sequence) tuples
-    """
-    sequences = []
-    
-    with open(input_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            parts = line.split(None, 1)  # Split on whitespace, max 2 parts
-            if len(parts) == 2:
-                idx, seq = parts
-                sequences.append((idx, seq.strip()))
-            elif len(parts) == 1:
-                seq = parts[0]
-                idx = len(sequences) + 1
-                sequences.append((str(idx), seq.strip()))
-    
-    return sequences
-
-
 def load_esmfold_model(device="cuda"):
     """Load ESMFold model with memory optimizations"""
     from transformers import EsmForProteinFolding
@@ -80,7 +57,7 @@ def load_esmfold_model(device="cuda"):
     print(f"{'='*60}")
     
     # Try local model first
-    local_model_path = Path(__file__).parent / "esmfold_v1_local"
+    local_model_path = ESMFOLD_LOCAL_DIR
     
     # Load in FP16 for memory efficiency
     load_dtype = torch.float16 if device == "cuda" else torch.float32

@@ -16,34 +16,10 @@ import torch
 import pandas as pd
 from tqdm import tqdm
 
-
-def parse_sequence_file(input_file):
-    """
-    Parse sequence file in SVM format:
-    1 MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPN
-    2 GVVDSDDLPLVVAASNAGKSTVVQLLAAAG
-    
-    Returns list of (index, sequence) tuples
-    """
-    sequences = []
-    
-    with open(input_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            parts = line.split(None, 1)  # Split on whitespace, max 2 parts
-            if len(parts) == 2:
-                idx, seq = parts
-                sequences.append((idx, seq.strip()))
-            elif len(parts) == 1:
-                # Just sequence, no index
-                seq = parts[0]
-                idx = len(sequences) + 1
-                sequences.append((str(idx), seq.strip()))
-    
-    return sequences
+# Make utils/ importable regardless of cwd
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.paths import ESMFOLD_LOCAL_DIR
+from utils.sequence_io import parse_sequence_file
 
 
 def extract_esm2_embeddings(sequences, model_name="esm2_t33_650M_UR50D", device="cuda"):
@@ -131,7 +107,7 @@ def predict_structures_esmfold(sequences, output_dir, device="cuda", max_length=
     print(f"{'='*60}")
     
     # Try to load from local directory first
-    local_model_path = Path(__file__).parent / "esmfold_v1_local"
+    local_model_path = ESMFOLD_LOCAL_DIR
     
     # Load model in FP16 directly to save memory (crucial for 12GB GPUs!)
     load_dtype = torch.float16 if device == "cuda" else torch.float32

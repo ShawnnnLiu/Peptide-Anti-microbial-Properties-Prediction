@@ -116,3 +116,29 @@ def test_help_build_geometric_features():
 def test_help_generate_stapep_structures():
     """--help exits before any model load (no GPU/download needed)."""
     _help("feature_extraction/generate_stapep_structures.py")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# models/ slice
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_help_extract_structure_features():
+    """CPU-only (numpy/pandas) — no torch, no model load."""
+    _help("models/extract_structure_features.py")
+
+
+@requires_torch
+def test_help_batch_esmfold():
+    """--help exits during parse_args(), before any ESMFold load. Also proves
+    the standalone sys.path bootstrap + utils imports resolve outside pytest."""
+    _help("models/batch_esmfold.py")
+
+
+@requires_torch
+def test_help_run_esmfold_peptides():
+    _help("models/run_esmfold_peptides.py")
+
+
+@requires_torch
+def test_help_esm_sequence_processor():
+    _help("models/esm_sequence_processor.py")

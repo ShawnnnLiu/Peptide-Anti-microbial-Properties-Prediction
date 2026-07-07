@@ -33,11 +33,18 @@ from sklearn.metrics import (
     matthews_corrcoef
 )
 
-# Local imports
+# Local imports — use package-qualified names so this module never claims the
+# top-level ``models`` name. The previous ``sys.path.insert(<this dir>)`` +
+# bare ``from models import ...`` registered nn_pipeline/models.py as the global
+# ``models`` module, shadowing the models/ ESMFold package for the rest of the
+# process. Bootstrap PROJECT_ROOT instead so ``python nn_pipeline/train.py``
+# still runs standalone.
 import sys
-sys.path.insert(0, str(Path(__file__).parent))
-from feature_dataset import FeaturePipeline
-from models import AMPClassifier, AMPClassifierWithAttention, FocalLoss, get_model, count_parameters
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from nn_pipeline.feature_dataset import FeaturePipeline
+from nn_pipeline.models import (
+    AMPClassifier, AMPClassifierWithAttention, FocalLoss, get_model, count_parameters,
+)
 
 
 class EarlyStopping:

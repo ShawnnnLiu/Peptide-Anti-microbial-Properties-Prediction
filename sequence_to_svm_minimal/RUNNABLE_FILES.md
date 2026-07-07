@@ -322,6 +322,34 @@ The five variants have different censored-value handling, different unit priorit
 - `figures/` (2 files), `debug_checks/` (7 files), top-level `run_*_stapep.py` (4 WSL+stap files), `cli/` (3 TODO stubs), `stapep_package/` (vendored library — should not be modified).
 - Deferred items: MIC parser centralization (5 inline variants); native peptide feature dict consolidation (2 precision tiers).
 
+### Slice 7: models — COMPLETE (2026-07-06)
+
+**New shared code:**
+- `utils/sequence_io.py` — `parse_sequence_file()` returning `(idx, seq)` pairs. Replaces 3 inline copies: `models/batch_esmfold.py` and `models/esm_sequence_processor.py` (byte-identical) use it directly; `models/run_esmfold_peptides.py` now wraps it to build its `(unique_id, idx, seq, label)` 4-tuples. Byte-for-byte behavior verified by `test_parse_sequence_file_pairs` + `_run_esmfold_wrapper`.
+- New constants in `utils/paths.py`: `MODELS_DIR`, `ESMFOLD_LOCAL_DIR` (= `MODELS_DIR/esmfold_v1_local`), `TORCH_HUB_CHECKPOINTS`, `HF_CACHE`.
+
+**Scripts migrated (models/):**
+- `batch_esmfold.py`, `run_esmfold_peptides.py`, `esm_sequence_processor.py` — 3 ESMFold drivers: `parse_sequence_file` → shared helper; `Path(__file__).parent/"esmfold_v1_local"` → `ESMFOLD_LOCAL_DIR` (same resolved path; dir doesn't exist so still HF-fallback — now location-stable). `run_esmfold_peptides.py` data-file argparse defaults → `DATA_DIR` (was `Path(__file__).parent.parent/"data"/...` — the folder move left it correct but fragile).
+- `check_cache.py`, `diagnose_model.py` — hardcoded torch-hub cache path → `TORCH_HUB_CHECKPOINTS`.
+- **Left as-is** (can't-run one-offs; no GPU to verify): `download_esmfold.py`, `download_esmfold_simple.py`, `download_from_huggingface.py`, `fix_hf_cache.py`, `test_gpu_esmfold.py`. The inline `~/.cache/huggingface` paths in the download scripts are a trivial pending follow-up.
+- TODO stubs `mic_predictor.py`, `train_mic.py` left as inert scaffolding (implementing them = the ESMFold-integration project, not this refactor).
+
+**Cross-folder fix surfaced by this slice:**
+- `nn_pipeline/train.py` did `sys.path.insert(0, <its own dir>)` + bare `from models import ...` / `from feature_dataset import ...`, which registered `nn_pipeline/models.py` as the **global** `models` module — shadowing the `models/` ESMFold package for the rest of any process that imported it and breaking every `import models.X`. Fixed: bootstrap `PROJECT_ROOT` + package-qualified `from nn_pipeline.models import ...` / `from nn_pipeline.feature_dataset import ...`. It was the only bare-`models` importer in the tree.
+
+**Duplication deferred (conservative scope — GPU inference paths not runnable to verify):**
+- Shared ESMFold loader (`esmfold_v1_local` + FP16 + `local_files_only` + HF-fallback) still copy-pasted across the 3 drivers → future `utils/pretrained_esm.py` once a GPU run can validate.
+- Checkpoint/resume plumbing (`load_checkpoint`/`save_checkpoint`/`predict_single_structure`/`estimate_time`) still duplicated between `batch_esmfold.py` and `run_esmfold_peptides.py`.
+- ESM-2 embedding extraction shared between `esm_sequence_processor.py` and `test_gpu_esmfold.py`.
+
+**Smoke tests added:**
+- 13 import tests (all models/ scripts; torch importers `@requires_torch`; `download_esmfold` guarded on `requests`). No main() ever invoked.
+- 4 `--help` subprocess tests: `extract_structure_features.py` (CPU-only) + the 3 ESMFold drivers (`@requires_torch`; `--help` exits before model load and proves the standalone bootstrap resolves).
+- 2 parser behavioral tests; 4 new path constants added to `test_import_utils_paths`.
+
+**Verification status (2026-07-06):**
+- `conda run -n esm_env python -m pytest tests/ -q` → **69 passed, 1 skipped, 0 failed**.
+
 ### Phase 4 (partial): archived 6 top-level Buforin scripts (2026-07-06)
 
 During the folder reorganization, six top-level scripts were deleted from the working tree
@@ -339,4 +367,4 @@ and PROJECT_MAP.md §10 for per-file provenance.
 **Still pending (out of all 5 model-folder slices):**
 - MIC parsing regex — 5 distinct variants still inline across `regression/`, `comparison/compare_buf_pmic.py`, `svm/predict_mic_svm.py`, `mlp/predict_mic_mlp.py`. Centralization deferred per PROJECT_MAP §7e.
 - Native peptide feature dicts (`BUF_WT_FEATURES`, `NATIVE`, `SP_FEATURES`) — still in 3-4 scripts at two precision tiers. Deferred per the same rule.
-- Folders not yet touched: `gnn/` (8 files — GPU+WSL, mostly experiment scripts), `feature_extraction/` (5 files — data generation), `models/` (13 files — ESMFold scripts), `stapep_package/` (vendored library), `figures/` (2 files), `debug_checks/` (7 files), `data/training_dataset/StaPep/` diagnostic scripts (17 files), `cli/` (3 TODO stubs), top-level `run_*_stapep.py` (4 files — WSL+stap).
+- Folders not yet touched (updated 2026-07-06, after the models/ slice): `gnn/` (8 files — GPU+WSL experiments), `nn_pipeline/` (5 files — PyTorch MLP; only `train.py`'s namespace bug fixed so far), `figures/` (2 files), `debug_checks/` (7 files), `data/training_dataset/StaPep/` diagnostic scripts (17 files), `cli/` (3 TODO stubs), top-level `run_*_stapep.py` (4 files — WSL+stap), `stapep_package/` (vendored library — do not modify). Done: svm, mlp, regression, comparison, feature_extraction, models.

@@ -2,9 +2,15 @@
 Diagnose ESMFold model file corruption
 """
 
+import sys
 import torch
 from pathlib import Path
 import hashlib
+
+# Make utils/ importable regardless of cwd
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.paths import TORCH_HUB_CHECKPOINTS
+
 
 def check_file_integrity(filepath):
     """Check if the model file is corrupted"""
@@ -99,5 +105,5 @@ def check_file_integrity(filepath):
 
 
 if __name__ == "__main__":
-    meta_path = Path.home() / ".cache" / "torch" / "hub" / "checkpoints" / "esmfold_3B_v1.pt"
+    meta_path = TORCH_HUB_CHECKPOINTS / "esmfold_3B_v1.pt"
     check_file_integrity(meta_path)

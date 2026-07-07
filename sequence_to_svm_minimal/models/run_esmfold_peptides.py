@@ -25,6 +25,11 @@ from pathlib import Path
 import torch
 from tqdm import tqdm
 
+# Make utils/ importable regardless of cwd
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.paths import ESMFOLD_LOCAL_DIR, DATA_DIR
+from utils.sequence_io import parse_sequence_file as _parse_seq_pairs
+
 
 def load_checkpoint(checkpoint_file):
     """Load progress checkpoint if it exists"""
@@ -49,35 +54,18 @@ def save_checkpoint(checkpoint_file, checkpoint_data):
 
 
 def parse_sequence_file(input_file, label, prefix):
+    """Parse an SVM-format sequence file into
+    ``(unique_id, original_idx, sequence, label)`` tuples, where
+    ``unique_id = f"{prefix}_{idx}"``.
+
+    Thin wrapper over the shared ``utils.sequence_io.parse_sequence_file``
+    (which returns ``(idx, seq)`` pairs) — behavior is byte-for-byte the same
+    as the previous inline copy.
     """
-    Parse sequence file in SVM format:
-    1 MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPN
-    2 GVVDSDDLPLVVAASNAGKSTVVQLLAAAG
-    
-    Returns list of (unique_id, original_idx, sequence, label) tuples
-    """
-    sequences = []
-    
-    with open(input_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            parts = line.split(None, 1)
-            if len(parts) == 2:
-                idx, seq = parts
-                idx = idx.strip()
-                seq = seq.strip()
-                unique_id = f"{prefix}_{idx}"
-                sequences.append((unique_id, idx, seq, label))
-            elif len(parts) == 1:
-                seq = parts[0].strip()
-                idx = str(len(sequences) + 1)
-                unique_id = f"{prefix}_{idx}"
-                sequences.append((unique_id, idx, seq, label))
-    
-    return sequences
+    return [
+        (f"{prefix}_{idx}", idx, seq, label)
+        for idx, seq in _parse_seq_pairs(input_file)
+    ]
 
 
 def load_esmfold_model(device="cuda"):
@@ -88,7 +76,7 @@ def load_esmfold_model(device="cuda"):
     print(f"  Loading ESMFold Model")
     print(f"{'='*60}")
     
-    local_model_path = Path(__file__).parent / "esmfold_v1_local"
+    local_model_path = ESMFOLD_LOCAL_DIR
     load_dtype = torch.float16 if device == "cuda" else torch.float32
     
     if local_model_path.exists():
@@ -164,9 +152,8 @@ Examples:
         """
     )
     
-    script_dir = Path(__file__).parent.parent
-    default_amp = script_dir / "data" / "training_dataset" / "seqs_AMP.txt"
-    default_decoy = script_dir / "data" / "training_dataset" / "seqs_decoy_subsample.txt"
+    default_amp = DATA_DIR / "seqs_AMP.txt"
+    default_decoy = DATA_DIR / "seqs_decoy_subsample.txt"
     
     parser.add_argument('--amp-file', '-a', type=str,
                         default=str(default_amp),

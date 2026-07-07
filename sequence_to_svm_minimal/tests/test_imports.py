@@ -25,6 +25,9 @@ def test_import_utils_paths():
         "DESCRIPTORS_DIR", "AAINDEX_DIR", "RESULTS_DIR", "FIGURES_DIR",
         "PRETRAINED_PARAMS_DIR", "PRETRAINED_SVC_PKL",
         "PRETRAINED_ZSCORE_CSV", "LIVE_PARAMS_DIR",
+        # models/ slice additions
+        "MODELS_DIR", "ESMFOLD_LOCAL_DIR",
+        "TORCH_HUB_CHECKPOINTS", "HF_CACHE",
     ):
         assert hasattr(mod, name), f"utils.paths missing {name}"
 
@@ -308,3 +311,110 @@ def test_pretrained_svm_loader_reproduces_known_constants():
 def test_import_features_geometric_features():
     Bio = pytest.importorskip("Bio", reason="biopython not installed")
     importlib.import_module("features.geometric_features")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# models/ slice — ESMFold drivers, ESM-2 processor, cache/download tools.
+# All are import-safe (heavy work + input()/CUDA/downloads live inside main()).
+# The torch-importing ones are gated; their main() is NEVER invoked in tests.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_import_models_check_cache():
+    importlib.import_module("models.check_cache")
+
+
+@requires_torch
+def test_import_models_diagnose_model():
+    importlib.import_module("models.diagnose_model")
+
+
+def test_import_models_download_esmfold():
+    pytest.importorskip("requests", reason="requests not installed")
+    importlib.import_module("models.download_esmfold")
+
+
+def test_import_models_download_esmfold_simple():
+    importlib.import_module("models.download_esmfold_simple")
+
+
+def test_import_models_download_from_huggingface():
+    importlib.import_module("models.download_from_huggingface")
+
+
+def test_import_models_fix_hf_cache():
+    importlib.import_module("models.fix_hf_cache")
+
+
+def test_import_models_extract_structure_features():
+    """CPU-only (numpy/pandas); the safest models/ CLI to smoke-test."""
+    importlib.import_module("models.extract_structure_features")
+
+
+@requires_torch
+def test_import_models_batch_esmfold():
+    """Imports cleanly; main() is GPU/ESMFold — never invoked in tests."""
+    importlib.import_module("models.batch_esmfold")
+
+
+@requires_torch
+def test_import_models_run_esmfold_peptides():
+    importlib.import_module("models.run_esmfold_peptides")
+
+
+@requires_torch
+def test_import_models_esm_sequence_processor():
+    importlib.import_module("models.esm_sequence_processor")
+
+
+@requires_torch
+def test_import_models_test_gpu_esmfold():
+    """Import-safe; main() needs CUDA + calls input() — never invoked in tests."""
+    importlib.import_module("models.test_gpu_esmfold")
+
+
+def test_import_models_mic_predictor():
+    """TODO scaffolding — must at least import as a no-op."""
+    importlib.import_module("models.mic_predictor")
+
+
+def test_import_models_train_mic():
+    """TODO scaffolding — must at least import as a no-op."""
+    importlib.import_module("models.train_mic")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Shared sequence-file parser (new in models/ slice) — must reproduce the
+# behavior of the three inline copies it replaced, byte-for-byte.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_parse_sequence_file_pairs(tmp_path):
+    from utils.sequence_io import parse_sequence_file
+    p = tmp_path / "seqs.txt"
+    p.write_text(
+        "# a comment line\n"
+        "\n"
+        "1 MKTAYIAK\n"
+        "2   GVVDSDD\n"       # multiple spaces between index and sequence
+        "ACDEFG\n"            # index-less line -> auto 1-based position
+        "   \n"               # whitespace-only line, skipped
+        "7 LASTONE\n"
+    )
+    assert parse_sequence_file(str(p)) == [
+        ("1", "MKTAYIAK"),
+        ("2", "GVVDSDD"),
+        ("3", "ACDEFG"),      # 3rd parsed entry -> index "3", not line number
+        ("7", "LASTONE"),
+    ]
+
+
+@requires_torch
+def test_parse_sequence_file_run_esmfold_wrapper(tmp_path):
+    """run_esmfold_peptides wraps the shared parser into 4-tuples with a
+    prefix/label — confirm it matches the previous inline implementation."""
+    mod = importlib.import_module("models.run_esmfold_peptides")
+    p = tmp_path / "amp.txt"
+    p.write_text("1 MKTAYIAK\nGVVDSDD\n")
+    assert mod.parse_sequence_file(str(p), label=1, prefix="AMP") == [
+        ("AMP_1", "1", "MKTAYIAK", 1),
+        ("AMP_2", "2", "GVVDSDD", 1),
+    ]
