@@ -10,6 +10,7 @@ Combines:
 Total: 27-39 features depending on configuration.
 """
 
+import sys
 import numpy as np
 import pandas as pd
 import torch
@@ -20,20 +21,17 @@ from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Union
 import json
 
+# Bootstrap project root so ``python nn_pipeline/feature_dataset.py`` can reach
+# the sibling ``features`` / ``utils`` packages when run standalone.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from features.geometric_columns import (
+    PLDDT_COLS, COMPACTNESS_COLS, SECONDARY_STRUCTURE_COLS,
+    SASA_COLS, SEQUENCE_COLS, CURVATURE_COLS, GEO_FEATURE_COLS,
+)
+from utils.paths import DATA_DIR
 
-# Feature column groups
-PLDDT_COLS = ['plddt_mean', 'plddt_std', 'plddt_min', 'plddt_max']
-COMPACTNESS_COLS = ['radius_gyration', 'end_to_end_distance', 'max_pairwise_distance',
-                    'centroid_distance_mean', 'centroid_distance_std']
-SECONDARY_STRUCTURE_COLS = ['fraction_helix', 'fraction_sheet', 'fraction_coil']
-SASA_COLS = ['total_sasa', 'hydrophobic_sasa', 'fraction_hydrophobic_sasa']
-SEQUENCE_COLS = ['length', 'net_charge', 'mean_hydrophobicity', 'hydrophobic_moment']
-CURVATURE_COLS = ['curvature_mean', 'curvature_std', 'curvature_max', 
-                  'torsion_mean', 'torsion_std']
-
-# All geometric features
-GEOMETRIC_FEATURE_COLS = (PLDDT_COLS + COMPACTNESS_COLS + SECONDARY_STRUCTURE_COLS + 
-                          SASA_COLS + SEQUENCE_COLS + CURVATURE_COLS)
+# All geometric features (shared canonical Geo-24 list).
+GEOMETRIC_FEATURE_COLS = list(GEO_FEATURE_COLS)
 
 # SVM output features
 SVM_COLS = ['svm_sigma', 'svm_prob_positive']
@@ -293,11 +291,9 @@ class FeaturePipeline:
 
 def main():
     """Demo of the feature pipeline."""
-    base_dir = Path(__file__).parent.parent
-    
     # Initialize pipeline
     pipeline = FeaturePipeline(
-        geometric_csv=base_dir / "data" / "training_dataset" / "geometric_features.csv",
+        geometric_csv=DATA_DIR / "geometric_features.csv",
         use_svm_features=False,  # Set to True if you have SVM outputs
         use_descriptor_features=False
     )

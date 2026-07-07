@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import requires_skl, requires_torch, requires_bio
+from conftest import requires_skl, requires_torch, requires_tg, requires_bio
 
 ROOT = Path(__file__).resolve().parent.parent  # sequence_to_svm_minimal/
 
@@ -142,3 +142,56 @@ def test_help_run_esmfold_peptides():
 @requires_torch
 def test_help_esm_sequence_processor():
     _help("models/esm_sequence_processor.py")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# gnn/ slice
+# ──────────────────────────────────────────────────────────────────────────────
+# Only run_gnn_training.py is argparse-driven; the other four gnn scripts run
+# main() directly from a hardcoded CONFIG (no --help). --help exits during
+# parse_args(), before any dataset load or GPU work. Requires torch_geometric
+# (import of gnn.data_utils), so SKIPS under esm_env — runs under the WSL venv.
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_help_run_gnn_training():
+    _help("gnn/run_gnn_training.py")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# figures/ slice
+# ──────────────────────────────────────────────────────────────────────────────
+
+@requires_skl
+def test_help_plot_mic_distribution():
+    """argparse (--save); --help exits before any data load. Imports sklearn +
+    matplotlib(Agg) + scipy at module top, so it also proves the standalone
+    utils/features bootstrap resolves outside pytest."""
+    _help("figures/plot_mic_distribution.py")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# top-level StaPep MD drivers (live OUTSIDE the package, at the repo root).
+# Only run_buforin_stapep.py is argparse-driven; its stapep/OpenMM imports are
+# function-local, so --help parses and exits without needing the WSL stap env.
+# The other three (run_buf_variants_stapep, test_buf_variant_single,
+# test_wsl_stapep) have no argparse and would start real MD / import stapep at
+# module level, so they are intentionally not smoke-tested here.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_help_run_buforin_stapep():
+    # Top-level drivers live at the workspace root: seq2svm/ -> ...Prediction/ ->
+    # SVM_ESM_Peptides/. That's two parents up from ROOT (= sequence_to_svm_minimal).
+    repo_root = ROOT.parent.parent
+    script = repo_root / "run_buforin_stapep.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        capture_output=True, text=True, timeout=60, cwd=str(repo_root),
+    )
+    assert result.returncode == 0, (
+        f"run_buforin_stapep.py --help exited {result.returncode}\n"
+        f"stderr: {result.stderr[:600]}"
+    )
+    assert "usage" in (result.stdout + result.stderr).lower()

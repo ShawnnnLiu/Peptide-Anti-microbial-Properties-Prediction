@@ -22,7 +22,6 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.model_selection import GroupKFold, StratifiedShuffleSplit
-import joblib
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -30,17 +29,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gnn.data_utils import PeptideGraphDataset, create_dataloaders
 from gnn.models import PeptideGNN
 from gnn.train import run_training, evaluate, cross_validate, print_cv_summary
+from utils.paths import DATA_DIR, RESULTS_DIR
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train GNN for peptide classification')
     
     # Data arguments
-    parser.add_argument('--csv_path', type=str, 
-                        default='data/training_dataset/geometric_features_clustered.csv',
+    parser.add_argument('--csv_path', type=str,
+                        default=str(DATA_DIR / 'geometric_features_clustered.csv'),
                         help='Path to CSV with peptide data')
     parser.add_argument('--pdb_dir', type=str,
-                        default='data/training_dataset',
+                        default=str(DATA_DIR),
                         help='Directory containing PDB files')
     
     # Model arguments
@@ -89,7 +89,7 @@ def parse_args():
                         help='Random seed')
     parser.add_argument('--device', type=str, default='auto',
                         help='Device (auto, cuda, cpu)')
-    parser.add_argument('--output_dir', type=str, default='results/gnn',
+    parser.add_argument('--output_dir', type=str, default=str(RESULTS_DIR / 'gnn'),
                         help='Output directory')
     
     return parser.parse_args()

@@ -8,6 +8,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from features.geometric_features import parse_pdb_structure, compute_dihedral
+from utils.paths import STRUCTURES_DIR
 
 
 def analyze_phi_psi(pdb_path):
@@ -110,9 +111,8 @@ def analyze_phi_psi(pdb_path):
 
 
 def main():
-    base_dir = Path(__file__).resolve().parent.parent
-    amp_dir = base_dir / "data" / "training_dataset" / "structures" / "AMP"
-    decoy_dir = base_dir / "data" / "training_dataset" / "structures" / "DECOY"
+    amp_dir = STRUCTURES_DIR / "AMP"
+    decoy_dir = STRUCTURES_DIR / "DECOY"
     
     print("\n" + "🔍" * 30)
     print("  SECONDARY STRUCTURE DEBUG")

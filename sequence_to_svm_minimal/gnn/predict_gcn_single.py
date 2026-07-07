@@ -33,6 +33,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gnn.models import PeptideGNN
 from gnn.train import run_training
 from torch_geometric.loader import DataLoader
+from utils.paths import STAPEP_DIR, ESMFOLD_LOCAL_DIR
+from utils.sequence_io import parse_sequence_file
 
 import pandas as pd
 
@@ -55,11 +57,11 @@ CANDIDATES = [
 # CONFIG
 # =============================================================================
 CONFIG = {
-    'amp_seqs':     'data/training_dataset/StaPep/seqs_AMP_stapep.txt',
-    'decoy_seqs':   'data/training_dataset/StaPep/seqs_DECOY_stapep.txt',
-    'amp_pdb_dir':  'data/training_dataset/StaPep/structures/AMP',
-    'decoy_pdb_dir':'data/training_dataset/StaPep/structures/DECOY',
-    'test_pdb_dir': 'data/training_dataset/StaPep/structures/TEST',
+    'amp_seqs':     str(STAPEP_DIR / 'seqs_AMP_stapep.txt'),
+    'decoy_seqs':   str(STAPEP_DIR / 'seqs_DECOY_stapep.txt'),
+    'amp_pdb_dir':  str(STAPEP_DIR / 'structures' / 'AMP'),
+    'decoy_pdb_dir':str(STAPEP_DIR / 'structures' / 'DECOY'),
+    'test_pdb_dir': str(STAPEP_DIR / 'structures' / 'TEST'),
     'seed':          42,
     'epochs':        500,
     'batch_size':    16,
@@ -83,21 +85,6 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
-def parse_sequence_file(path):
-    sequences = []
-    with open(path, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            parts = line.split(None, 1)
-            if len(parts) == 2:
-                sequences.append((parts[0].strip(), parts[1].strip()))
-            elif len(parts) == 1:
-                sequences.append((str(len(sequences) + 1), parts[0].strip()))
-    return sequences
-
-
 # =============================================================================
 # STRUCTURE GENERATION (ESMFold) — only for missing TEST PDBs
 # =============================================================================
@@ -118,7 +105,7 @@ def generate_test_structures(candidates, output_dir, device_str):
     from transformers import EsmForProteinFolding
 
     load_dtype = torch.float16 if device_str == "cuda" else torch.float32
-    local_path = Path(__file__).resolve().parent.parent / "models" / "esmfold_v1_local"
+    local_path = ESMFOLD_LOCAL_DIR
     if local_path.exists():
         model = EsmForProteinFolding.from_pretrained(
             str(local_path), local_files_only=True,

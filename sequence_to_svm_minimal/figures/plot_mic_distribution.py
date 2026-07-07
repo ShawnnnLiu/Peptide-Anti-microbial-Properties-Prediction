@@ -21,6 +21,7 @@ Usage
 from __future__ import annotations
 
 import re
+import sys
 import argparse
 import warnings
 from pathlib import Path
@@ -36,32 +37,26 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute   import SimpleImputer
 from sklearn.pipeline import Pipeline as SKPipeline
 
+# Bootstrap project root so a standalone ``python figures/plot_mic_distribution.py``
+# can reach the shared ``utils`` / ``features`` packages.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.paths import STAPEP_DIR
+from features.stapep_columns import STAPEP_COLS, STAPEP_COLS_PAPER_14
+
 warnings.filterwarnings("ignore")
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-BASE      = Path(__file__).resolve().parent.parent
-STAPEP    = BASE / "data" / "training_dataset" / "StaPep"
-FEAT_CSV  = STAPEP / "stapled_amps_features.csv"
-AMP_CSV   = STAPEP / "stapled_amps.csv"
-DECOY_CSV = STAPEP / "stapled_decoys.csv"
-PNAS_CSV  = STAPEP / "PNAS_paper_datasets" / "Stapled-peptide_permeability_filtered.csv"
+FEAT_CSV  = STAPEP_DIR / "stapled_amps_features.csv"
+AMP_CSV   = STAPEP_DIR / "stapled_amps.csv"
+DECOY_CSV = STAPEP_DIR / "stapled_decoys.csv"
+PNAS_CSV  = STAPEP_DIR / "PNAS_paper_datasets" / "Stapled-peptide_permeability_filtered.csv"
 
-FEATURES = [
-    "length", "weight", "hydrophobic_index", "charge", "aromaticity",
-    "isoelectric_point", "fraction_arginine", "fraction_lysine",
-    "lyticity_index",
-    "helix_percent", "sheet_percent", "loop_percent",
-    "mean_bfactor", "mean_gyrate", "num_hbonds", "psa", "sasa",
-]
+# 17 StaPep features (shared canonical list).
+FEATURES = STAPEP_COLS
 
 # The 14 features shown in the StaPep paper Fig 4B
-# (excludes sheet_percent, lyticity_index, sasa)
-PAPER_FEATURES = [
-    "length", "weight", "hydrophobic_index", "charge", "aromaticity",
-    "isoelectric_point", "fraction_arginine", "fraction_lysine",
-    "helix_percent", "loop_percent",
-    "mean_bfactor", "mean_gyrate", "num_hbonds", "psa",
-]
+# (excludes sheet_percent, lyticity_index, sasa) — shared canonical list.
+PAPER_FEATURES = STAPEP_COLS_PAPER_14
 
 # Human-readable labels matching the StaPep paper's axis labels
 FEATURE_LABELS = {

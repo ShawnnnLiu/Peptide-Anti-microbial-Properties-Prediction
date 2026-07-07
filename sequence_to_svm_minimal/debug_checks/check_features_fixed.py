@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """Check the fixed geometric features for quality."""
 
+import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
 
+# Bootstrap project root so this script can reach the shared path module whether
+# run standalone or imported.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.paths import DATA_DIR
+
+
 def main():
-    csv_path = Path(__file__).resolve().parent.parent / "data" / "training_dataset" / "geometric_features_fixed.csv"
+    csv_path = DATA_DIR / "geometric_features_fixed.csv"
     
     print("\n" + "=" * 70)
     print("  GEOMETRIC FEATURES QUALITY CHECK (FIXED)")

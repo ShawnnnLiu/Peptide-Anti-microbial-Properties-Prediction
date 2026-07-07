@@ -350,6 +350,73 @@ The five variants have different censored-value handling, different unit priorit
 **Verification status (2026-07-06):**
 - `conda run -n esm_env python -m pytest tests/ -q` → **69 passed, 1 skipped, 0 failed**.
 
+### Slice 8: gnn — COMPLETE (2026-07-06)
+
+**Environment note:** gnn scripts run under the WSL `venv` (torch + torch_geometric).
+`torch_geometric` is NOT installed in the Windows `esm_env` used for the pytest
+run, so all 10 new gnn tests **skip** there (not fail). They were validated for
+real under the **WSL `esm_env`** conda env (which *does* have torch + torch_geometric
++ Bio) via a standalone script — every gnn module imports, all migrations resolve,
+`run_gnn_training.py --help` exits 0.
+
+**Core library (no changes needed beyond one dedup — already clean):**
+- `gnn/data_utils.py` — extracted the 24-element geometric-feature column list to a
+  module-level constant `DEFAULT_GEO_FEATURE_COLS` (single source of truth).
+  `PeptideGraphDataset` now defaults to `list(DEFAULT_GEO_FEATURE_COLS)`.
+  **Deliberately NOT reused** `features.geometric_features.get_feature_names()` — that
+  list includes the categorical `ss_method` marker (25 cols), which would change
+  `geo_feature_dim` from 24 to 25 and break the models.
+- `gnn/models.py`, `gnn/train.py`, `gnn/__init__.py` — no path/constant duplication; left as-is.
+
+**Scripts migrated (all 5 gnn/ driver scripts):**
+- `gnn/run_gnn_training.py` — argparse CLI. Removed unused `import joblib`. `--csv_path`
+  / `--pdb_dir` / `--output_dir` argparse defaults migrated from cwd-relative strings to
+  `str(DATA_DIR / ...)` / `str(RESULTS_DIR / 'gnn')` (now project-root-absolute).
+- `gnn/run_gnn_comparison.py` — `CONFIG` paths → `DATA_DIR`; output dirs → `RESULTS_DIR`;
+  inline 12-element QSAR list → `features.stapep_columns.QSAR_COLS` (verified byte-identical);
+  inline 24-element geo list → `gnn.data_utils.DEFAULT_GEO_FEATURE_COLS`.
+- `gnn/predict_gcn_single.py` — `CONFIG` paths → `STAPEP_DIR`; ESMFold local path →
+  `ESMFOLD_LOCAL_DIR`; inline `parse_sequence_file` → `utils.sequence_io.parse_sequence_file`.
+- `gnn/predict_stapep_candidates.py` — same treatment; output dir → `RESULTS_DIR / 'stapep_predictions'`.
+- `gnn/run_stapep_gnn_comparison.py` — same treatment; `output_dir` CONFIG → `STAPEP_DIR`;
+  output dirs → `RESULTS_DIR / 'stapep_gnn'`. Kept its unique `clean_sequence` staple-notation cleaner inline.
+
+**Consolidation this slice:**
+- `utils.sequence_io.parse_sequence_file` — now used by 3 more scripts (the gnn drivers), 4 inline
+  copies removed total this slice. All were behaviorally identical (`line.split(None,1)` makes the
+  `parts[0].strip()` vs unstripped-idx difference a no-op).
+- `features.stapep_columns.QSAR_COLS` — the last remaining verbatim copy (flagged in §9) is now gone.
+- New `gnn.data_utils.DEFAULT_GEO_FEATURE_COLS` — dedups the two identical 24-col copies (data_utils + run_gnn_comparison).
+
+**Models-shadowing gotcha (watched per the refactor-status memo): NOT present in gnn.**
+All gnn scripts already used `sys.path.insert(<project root>)` + package-qualified
+`from gnn.X import ...` (never a bare `from models import ...`), so the `nn_pipeline/train.py`
+hazard does not recur here. The `sys.path.insert` bootstrap is retained (needed for standalone
+`python gnn/run_gnn_training.py` execution; it also enables the new `utils.*`/`features.*` imports).
+
+**Deferred (conservative scope — GPU/venv training paths not runnable to verify, per the
+same rule the models/ slice applied to the ESMFold drivers):**
+- Merging `predict_gcn_single.py` and `predict_stapep_candidates.py` (§9 "merge with --ensemble-size").
+  They are NOT "differ only in ensemble depth": single-GCN-full-train vs GCN+GAT+EGNN 5-fold ensemble
+  with σ_GNN calibration + JSON output. A behavior-changing merge of unverifiable ML scripts is out of scope.
+- `predict_gcn_single.py` uses `dtype=` and `predict_stapep_candidates.py` uses `torch_dtype=` on
+  `EsmForProteinFolding.from_pretrained` — left unchanged (path-only migration; kwarg divergence is pre-existing).
+
+**Smoke tests added:**
+- `conftest.requires_tg` marker wired into both test modules' imports (was already defined, now used).
+- 9 import tests (`gnn.data_utils` + `DEFAULT_GEO_FEATURE_COLS` assertions, `gnn.models`, `gnn.train`,
+  `gnn` package, + all 5 drivers). Gated `@requires_torch @requires_tg @requires_bio` (importing any
+  gnn submodule runs `gnn/__init__.py`, which pulls in `data_utils` → `Bio.PDB`). Regression asserts:
+  `run_gnn_comparison.QSAR_COLS == QSAR_COLS`, shared geo list identity, and `parse_sequence_file is`
+  the shared helper in all 3 rewritten scripts.
+- 1 `--help` subprocess test for `run_gnn_training.py` (the only argparse-driven gnn script).
+
+**Verification status (2026-07-06):**
+- Windows `esm_env`: `conda run -n esm_env python -m pytest tests/ -q` → **69 passed, 11 skipped, 0 failed**
+  (11 skips = 1 permanent `run_dataset_comparison` guard + 10 gnn tests skipped for missing torch_geometric).
+- WSL `esm_env` (has torch_geometric): standalone validation script — all gnn imports + migration
+  assertions pass; `run_gnn_training.py --help` exits 0; argparse defaults resolve project-root-absolute.
+
 ### Phase 4 (partial): archived 6 top-level Buforin scripts (2026-07-06)
 
 During the folder reorganization, six top-level scripts were deleted from the working tree
@@ -364,7 +431,90 @@ and PROJECT_MAP.md §10 for per-file provenance.
 - Open decision for a later slice: whether the two 18-feature `_v2` models should be promoted into
   `regression\` as an alternative feature configuration alongside the 14-feature paper-subset scripts.
 
-**Still pending (out of all 5 model-folder slices):**
+### Slice 9: nn_pipeline / figures / debug_checks / StaPep diagnostics / cli / top-level — COMPLETE (2026-07-06)
+
+Final Phase-3 pass over the six remaining folders. Verified: Windows `esm_env`
+`pytest tests/ -q` → **96 passed, 12 skipped** (was 69/11); the 12 skips = 1 permanent
+`run_dataset_comparison` guard + 11 torch_geometric-gated gnn tests. The gnn-touching
+change (below) + all gnn tests were re-validated under **WSL `esm_env`** (has torch_geometric)
+via a standalone script — all pass, `gnn/run_gnn_training.py --help` exits 0.
+
+**New shared module:**
+- `features/geometric_columns.py` — dependency-free single source of truth for the **Geo-24**
+  numeric column list (`GEO_FEATURE_COLS`) + its 6 semantic sub-groups (`PLDDT_COLS`,
+  `COMPACTNESS_COLS`, `SECONDARY_STRUCTURE_COLS`, `SASA_COLS`, `SEQUENCE_COLS`, `CURVATURE_COLS`).
+  Dedups the 24-col list that was copied verbatim in **three** places. Kept torch-free on purpose
+  so the pandas-only debug scripts can import it (gnn.data_utils needs torch_geometric,
+  nn_pipeline.feature_dataset needs torch). Still deliberately ≠ `features.geometric_features.get_feature_names()`
+  (that carries the 25th `ss_method` marker).
+- `gnn/data_utils.py` `DEFAULT_GEO_FEATURE_COLS` is now `list(GEO_FEATURE_COLS)` (was a literal) —
+  the gnn-slice "single source of truth" now re-exports the shared one. `run_gnn_comparison`'s
+  `is`-identity with it still holds (verified WSL).
+- `nn_pipeline/feature_dataset.py` imports the sub-groups + `GEO_FEATURE_COLS` from the shared module;
+  `GEOMETRIC_FEATURE_COLS = list(GEO_FEATURE_COLS)` (byte-identical to the old concat).
+
+**nn_pipeline/ (5 files):**
+- `train.py` — **fixed a latent runtime bug**: two function-local imports (`from feature_dataset import AMPDataset`
+  in `train_final_model()`, `from prepare_clusters import create_simple_clusters` in `main()`) were left bare
+  when the top-of-file bootstrap was changed (slice 7) to insert PROJECT_ROOT instead of the `nn_pipeline/` dir.
+  They now ModuleNotFound when the module is imported rather than run as a script. Both fixed to
+  package-qualified `from nn_pipeline.X import ...`. Regression-locked by `test_nn_pipeline_train_uses_package_qualified_imports`.
+- `feature_dataset.py` — added a PROJECT_ROOT bootstrap (for standalone runs), wired to the shared geo cols
+  and `utils.paths.DATA_DIR` (main() demo path). Behavior byte-identical (verified `GEOMETRIC_FEATURE_COLS == GEO_FEATURE_COLS`).
+- `models.py`, `prepare_clusters.py`, `__init__.py` — self-contained; no changes needed.
+
+**figures/ (2 `.py` files; 3 `.ipynb` notebooks left untouched — research artifacts):**
+- `plot_mic_distribution.py` — `BASE`/`STAPEP` → `utils.paths.STAPEP_DIR`; inline 17-col `FEATURES` → `STAPEP_COLS`
+  and 14-col `PAPER_FEATURES` → `STAPEP_COLS_PAPER_14` (both verified byte-identical). Added PROJECT_ROOT bootstrap.
+  Inline `FEATURE_LABELS` + `parse_ecoli_mic` MIC regex (variant F) kept inline.
+- `lyticity_vs_mic.py` — **module-level `sys.stdout = io.TextIOWrapper(...)` moved into main()** so the module
+  is now import-safe (regression-tested); `BASE`/`DATA` → `STAPEP_DIR`, output PNG path → `PROJECT_ROOT`. Inline
+  MIC regex + `BUF_WT` + 8-entry `LITERATURE_MIC` kept inline (distinct from `LITERATURE_MIC_ECOLI`).
+
+**debug_checks/ (7 files) — all now import-safe:**
+- `check_feature_overlap.py`, `check_feature_overlap_detailed.py`, `check_features.py` — wrapped module-level bodies
+  in `main()` + guard; relative/hardcoded CSV paths → `utils.paths.DATA_DIR`. `check_feature_overlap.py` inline
+  `qsar_feats`/`geo_feats` → `QSAR_COLS` / `GEO_FEATURE_COLS` (verified end-to-end: still finds the single
+  netCharge↔net_charge overlap, r=0.9516). `_detailed` keeps its per-feature meaning dicts (documentation).
+- `check_features_fixed.py` — already guarded; path → `DATA_DIR`.
+- `debug_secondary_structure.py` — already guarded; paths → `utils.paths.STRUCTURES_DIR`.
+- `check_pyg.py` — trivial diagnostic, wrapped in `main()` for import-testability.
+- `test_esmfold_quick.py` — model load moved into `main()` (was loading ESMFold at module level → unimportable);
+  now import-safe. (Not a pytest test — no `test_*` functions; pytest only collects from `tests/`.)
+
+**StaPep diagnostics (`data/training_dataset/StaPep/`) — 7 pandas-only sanity checkers made import-safe + smoke-tested:**
+- Wrapped in `main()` + removed hardcoded absolute `c:/Users/bioin/...` paths (→ script-relative `HERE = Path(__file__).parent`):
+  `_check_all_nan.py`, `_check_mag_i7.py`, `_check_feature_coverage.py`, `_verify_training_md4ns.py`.
+- Already guarded (no change): `_compare_replicate_md.py`, `_inspect_md50ns_in_progress.py`, `sanity_check_md_features.py`.
+- They live under a non-package dir (no `__init__.py` chain), so the smoke test loads each by file path via
+  `importlib.util.spec_from_file_location` (parametrized `test_stapep_diagnostic_import_safe`). Verified `_check_all_nan`
+  runs end-to-end (188 rows, flags DRAMP21556 NaN-energy).
+- **Intentionally NOT touched / NOT smoke-tested** (per REFACTOR_PLAN "preserve behavior; never regenerate canonical data"):
+  data-generation scripts (`extract_amp_features`, `_drop_dramp21556` [module-level canonical WRITE — never import],
+  `combine_stapled_paper_dataset`, `filter_drop_k_stapled`, `build_paper_supplement_mag115`, `convert_to_txt` [module-level write],
+  `_build_replicate_subset` [module-level write]); MD scripts (`run_amp_md_features`, `run_test_stapep_md` [WSL path hardcode §7d]);
+  WSL DSSP probe (`_probe_dssp_staples`); personal-path compare (`_paper_vs_dramp_compare` [reads a `~/Downloads` file, §7d]).
+
+**cli/ (3 TODO stubs):** `extract_features.py`, `predict_mic.py`, `train_model.py` left as inert scaffolding
+(implementing them = the ESMFold-integration project, not this refactor — same call as models/ `mic_predictor.py`/`train_mic.py`).
+Added 3 import smoke tests confirming they import as no-ops.
+
+**top-level WSL StaPep drivers (repo root, OUTSIDE the package):** documented + classified, **not rewired** (they are
+standalone WSL+stap production drivers; their `stapep_package`-locating logic is correct and coupling them to the seq2svm
+package would add path fragility for near-zero benefit — same conservative call as the archived `_v2` scripts).
+- `run_buforin_stapep.py` — argparse; stapep imports are function-local, so `--help` parses+exits without the stap env.
+  Added subprocess `--help` smoke test (`test_help_run_buforin_stapep`).
+- `run_buf_variants_stapep.py`, `test_buf_variant_single.py` — no argparse (run MD directly); import-safe but not smoke-tested.
+- `test_wsl_stapep.py` — **NOT import-safe by design** (module-level `import pytraj` + `sys.exit(1)` on failure); pure WSL diagnostic.
+
+**Tests added this slice:** +28 (1 skips on Windows): shared geo module; 5 nn_pipeline (incl. the train.py regression guard);
+2 figures (incl. lyticity sys.stdout guard); 7 debug_checks; 3 cli; 7 StaPep (parametrized); 2 `--help` subprocess
+(`plot_mic_distribution`, top-level `run_buforin_stapep`); 1 WSL-gated gnn-shared-cols equality.
+
+**Still pending (deferred, unchanged):**
 - MIC parsing regex — 5 distinct variants still inline across `regression/`, `comparison/compare_buf_pmic.py`, `svm/predict_mic_svm.py`, `mlp/predict_mic_mlp.py`. Centralization deferred per PROJECT_MAP §7e.
 - Native peptide feature dicts (`BUF_WT_FEATURES`, `NATIVE`, `SP_FEATURES`) — still in 3-4 scripts at two precision tiers. Deferred per the same rule.
-- Folders not yet touched (updated 2026-07-06, after the models/ slice): `gnn/` (8 files — GPU+WSL experiments), `nn_pipeline/` (5 files — PyTorch MLP; only `train.py`'s namespace bug fixed so far), `figures/` (2 files), `debug_checks/` (7 files), `data/training_dataset/StaPep/` diagnostic scripts (17 files), `cli/` (3 TODO stubs), top-level `run_*_stapep.py` (4 files — WSL+stap), `stapep_package/` (vendored library — do not modify). Done: svm, mlp, regression, comparison, feature_extraction, models.
+- StaPep data-generation / MD / WSL-only scripts (listed above) — logic intentionally frozen.
+- `stapep_package/` (vendored library — do not modify). Root-level `predict_mic_single.py` (seq2svm CLI, out of this task's scope).
+
+**All Phase-3 code folders are now done:** svm, mlp, regression, comparison, feature_extraction, models, gnn, nn_pipeline, figures, debug_checks, StaPep diagnostics, cli.

@@ -384,7 +384,7 @@ def train_final_model(pipeline: FeaturePipeline,
     X_test = pipeline.scaler.transform(X[test_idx])
     y_test = y[test_idx]
     
-    from feature_dataset import AMPDataset
+    from nn_pipeline.feature_dataset import AMPDataset
     from torch.utils.data import DataLoader
     test_dataset = AMPDataset(X_test, y_test)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
@@ -497,7 +497,7 @@ def main():
         print("   Creating simple clusters (this may take a moment)...")
         
         # Create simple clusters
-        from prepare_clusters import create_simple_clusters
+        from nn_pipeline.prepare_clusters import create_simple_clusters
         clustered_csv = args.data.parent / "geometric_features_clustered.csv"
         create_simple_clusters(args.data, clustered_csv, identity_threshold=0.80)
         

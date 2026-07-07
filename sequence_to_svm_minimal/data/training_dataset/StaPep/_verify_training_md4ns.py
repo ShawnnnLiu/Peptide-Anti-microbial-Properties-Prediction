@@ -15,33 +15,38 @@ SEQ_FEATS = ["length", "weight", "hydrophobic_index", "charge", "aromaticity",
 MD_FEATS  = ["helix_percent", "sheet_percent", "loop_percent",
              "mean_bfactor", "mean_gyrate", "num_hbonds", "psa", "sasa"]
 
-ids = pd.read_csv(ID_CSV, encoding="utf-8")["DRAMP_ID"].astype(str)
-df  = pd.read_csv(FEAT, encoding="utf-8")
+def main():
+    ids = pd.read_csv(ID_CSV, encoding="utf-8")["DRAMP_ID"].astype(str)
+    df  = pd.read_csv(FEAT, encoding="utf-8")
 
-print(f"Identity CSV rows : {len(ids)}")
-print(f"Feature CSV  rows : {len(df)}")
-print(f"Unique DRAMP_IDs  : {df['DRAMP_ID'].nunique()}")
+    print(f"Identity CSV rows : {len(ids)}")
+    print(f"Feature CSV  rows : {len(df)}")
+    print(f"Unique DRAMP_IDs  : {df['DRAMP_ID'].nunique()}")
 
-missing = set(ids) - set(df["DRAMP_ID"].astype(str))
-extra   = set(df["DRAMP_ID"].astype(str)) - set(ids)
-print(f"Missing from features (in ID file but not features): {len(missing)} {sorted(missing) if missing else ''}")
-print(f"Extra in features (not in ID file)                 : {len(extra)} {sorted(extra) if extra else ''}")
+    missing = set(ids) - set(df["DRAMP_ID"].astype(str))
+    extra   = set(df["DRAMP_ID"].astype(str)) - set(ids)
+    print(f"Missing from features (in ID file but not features): {len(missing)} {sorted(missing) if missing else ''}")
+    print(f"Extra in features (not in ID file)                 : {len(extra)} {sorted(extra) if extra else ''}")
 
-err_mask = df["extraction_error"].notna() & (df["extraction_error"].astype(str).str.strip() != "")
-print(f"\nRows with extraction_error: {int(err_mask.sum())}")
-if err_mask.any():
-    print(df.loc[err_mask, ["DRAMP_ID", "extraction_error"]].to_string(index=False))
+    err_mask = df["extraction_error"].notna() & (df["extraction_error"].astype(str).str.strip() != "")
+    print(f"\nRows with extraction_error: {int(err_mask.sum())}")
+    if err_mask.any():
+        print(df.loc[err_mask, ["DRAMP_ID", "extraction_error"]].to_string(index=False))
 
-print("\nNaN counts per feature column:")
-for col in SEQ_FEATS + MD_FEATS:
-    n = int(df[col].isna().sum())
-    flag = "" if n == 0 else "  <-- gap"
-    print(f"  {col:<22} {n:>4}{flag}")
+    print("\nNaN counts per feature column:")
+    for col in SEQ_FEATS + MD_FEATS:
+        n = int(df[col].isna().sum())
+        flag = "" if n == 0 else "  <-- gap"
+        print(f"  {col:<22} {n:>4}{flag}")
 
-bad_md = df[df[MD_FEATS].isna().any(axis=1)]
-print(f"\nRows with at least one NaN MD column: {len(bad_md)}")
-if len(bad_md):
-    print(bad_md[["DRAMP_ID"] + MD_FEATS].to_string(index=False))
+    bad_md = df[df[MD_FEATS].isna().any(axis=1)]
+    print(f"\nRows with at least one NaN MD column: {len(bad_md)}")
+    if len(bad_md):
+        print(bad_md[["DRAMP_ID"] + MD_FEATS].to_string(index=False))
 
-ok = (~err_mask) & df[MD_FEATS].notna().all(axis=1) & df[SEQ_FEATS].notna().all(axis=1)
-print(f"\nFully-complete rows (no error, no NaN): {int(ok.sum())} / {len(df)}")
+    ok = (~err_mask) & df[MD_FEATS].notna().all(axis=1) & df[SEQ_FEATS].notna().all(axis=1)
+    print(f"\nFully-complete rows (no error, no NaN): {int(ok.sum())} / {len(df)}")
+
+
+if __name__ == "__main__":
+    main()

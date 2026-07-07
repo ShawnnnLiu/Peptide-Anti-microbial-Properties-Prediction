@@ -29,10 +29,12 @@ os.environ['PYTHONWARNINGS'] = 'ignore'
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from gnn.data_utils import PeptideGraphDataset
+from gnn.data_utils import PeptideGraphDataset, DEFAULT_GEO_FEATURE_COLS
 from gnn.models import PeptideGNN
 from gnn.train import run_training, cross_validate, evaluate
 from torch_geometric.loader import DataLoader
+from utils.paths import DATA_DIR, RESULTS_DIR
+from features.stapep_columns import QSAR_COLS
 
 
 # =============================================================================
@@ -40,9 +42,9 @@ from torch_geometric.loader import DataLoader
 # =============================================================================
 
 CONFIG = {
-    'csv_path': 'data/training_dataset/geometric_features_clustered.csv',
-    'pdb_dir': 'data/training_dataset',
-    'qsar_csv': 'data/training_dataset/qsar12_descriptors.csv',
+    'csv_path': str(DATA_DIR / 'geometric_features_clustered.csv'),
+    'pdb_dir': str(DATA_DIR),
+    'qsar_csv': str(DATA_DIR / 'qsar12_descriptors.csv'),
     'seed': 42,
     'n_folds': 5,
     'epochs': 500,
@@ -81,12 +83,10 @@ def load_data_with_features(config):
     
     # Load QSAR features if needed
     qsar_df = pd.read_csv(config['qsar_csv'])
-    
-    # Merge QSAR features
-    qsar_cols = ['netCharge', 'FC', 'LW', 'DP', 'NK', 'AE', 'pcMK', 
-                 '_SolventAccessibilityD1025', 'tau2_GRAR740104', 
-                 'tau4_GRAR740104', 'QSO50_GRAR740104', 'QSO29_GRAR740104']
-    
+
+    # Merge QSAR features (12 PNAS descriptors — shared constant)
+    qsar_cols = list(QSAR_COLS)
+
     # Merge on peptide_id
     merged_df = geo_df.merge(qsar_df[['peptide_id'] + qsar_cols], on='peptide_id', how='left')
     
@@ -96,18 +96,9 @@ def load_data_with_features(config):
 def create_dataset_with_features(df, config, use_geo=True, use_qsar=False, qsar_cols=None):
     """Create a dataset with specified feature combination."""
     
-    # Geometric feature columns
-    geo_cols = [
-        'plddt_mean', 'plddt_std', 'plddt_min', 'plddt_max',
-        'radius_gyration', 'end_to_end_distance', 'max_pairwise_distance',
-        'centroid_distance_mean', 'centroid_distance_std',
-        'fraction_helix', 'fraction_sheet', 'fraction_coil',
-        'total_sasa', 'hydrophobic_sasa', 'fraction_hydrophobic_sasa',
-        'length', 'net_charge', 'mean_hydrophobicity', 'hydrophobic_moment',
-        'curvature_mean', 'curvature_std', 'curvature_max',
-        'torsion_mean', 'torsion_std'
-    ]
-    
+    # Geometric feature columns (shared constant — the "Geo-24" set)
+    geo_cols = DEFAULT_GEO_FEATURE_COLS
+
     # Determine which columns to use
     feature_cols = []
     if use_geo:
@@ -356,7 +347,7 @@ def main():
     
     # Create base directory for training curves
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    curves_base_dir = Path('results/gnn/curves') / f'run_{timestamp}'
+    curves_base_dir = RESULTS_DIR / 'gnn' / 'curves' / f'run_{timestamp}'
     curves_base_dir.mkdir(parents=True, exist_ok=True)
     print(f"\n📁 Training curves will be saved to: {curves_base_dir}")
     
@@ -455,16 +446,16 @@ MLP (Combined-36)          0.9908 ± 0.0040    0.9453 ± 0.0243    0.8946 ± 0.0
 """)
     
     # Save results
-    os.makedirs('results/gnn', exist_ok=True)
-    
+    os.makedirs(RESULTS_DIR / 'gnn', exist_ok=True)
+
     results_dict = {
         'config': CONFIG,
         'results': all_results,
         'timestamp': timestamp,
         'curves_dir': str(curves_base_dir)
     }
-    
-    json_path = f'results/gnn/gnn_comparison_{timestamp}.json'
+
+    json_path = str(RESULTS_DIR / 'gnn' / f'gnn_comparison_{timestamp}.json')
     with open(json_path, 'w') as f:
         json.dump(results_dict, f, indent=2)
     print(f"\n💾 Results saved to: {json_path}")

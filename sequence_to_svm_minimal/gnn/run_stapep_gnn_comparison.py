@@ -38,6 +38,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gnn.models import PeptideGNN
 from gnn.train import run_training
 from torch_geometric.loader import DataLoader
+from utils.paths import STAPEP_DIR, RESULTS_DIR
+from utils.sequence_io import parse_sequence_file
 
 
 # =============================================================================
@@ -46,11 +48,11 @@ from torch_geometric.loader import DataLoader
 
 CONFIG = {
     # New txt file format (matching generate_stapep_structures.py)
-    'amp_seqs': 'data/training_dataset/StaPep/seqs_AMP_stapep.txt',
-    'decoy_seqs': 'data/training_dataset/StaPep/seqs_DECOY_stapep.txt',
-    'amp_pdb_dir': 'data/training_dataset/StaPep/structures/AMP',
-    'decoy_pdb_dir': 'data/training_dataset/StaPep/structures/DECOY',
-    'output_dir': 'data/training_dataset/StaPep',
+    'amp_seqs': str(STAPEP_DIR / 'seqs_AMP_stapep.txt'),
+    'decoy_seqs': str(STAPEP_DIR / 'seqs_DECOY_stapep.txt'),
+    'amp_pdb_dir': str(STAPEP_DIR / 'structures' / 'AMP'),
+    'decoy_pdb_dir': str(STAPEP_DIR / 'structures' / 'DECOY'),
+    'output_dir': str(STAPEP_DIR),
     'seed': 42,
     'n_folds': 5,
     'epochs': 500,
@@ -115,34 +117,6 @@ def clean_sequence(seq):
     cleaned = ''.join([aa for aa in seq.upper() if aa in standard_aa])
     
     return cleaned if len(cleaned) >= 5 else None  # Minimum length 5
-
-
-def parse_sequence_file(input_file):
-    """
-    Parse sequence file in format:
-        1 MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPN
-        2 GVVDSDDLPLVVAASNAGKSTVVQLLAAAG
-    
-    Returns list of (index, sequence) tuples
-    """
-    sequences = []
-    
-    with open(input_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            parts = line.split(None, 1)  # Split on whitespace, max 2 parts
-            if len(parts) == 2:
-                idx, seq = parts
-                sequences.append((idx.strip(), seq.strip()))
-            elif len(parts) == 1:
-                seq = parts[0]
-                idx = len(sequences) + 1
-                sequences.append((str(idx), seq.strip()))
-    
-    return sequences
 
 
 def prepare_stapep_dataset(config):
@@ -484,7 +458,7 @@ def main():
     
     # Create base directory for training curves
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    curves_base_dir = Path('results/stapep_gnn/curves') / f'run_{timestamp}'
+    curves_base_dir = RESULTS_DIR / 'stapep_gnn' / 'curves' / f'run_{timestamp}'
     curves_base_dir.mkdir(parents=True, exist_ok=True)
     print(f"\n📁 Training curves will be saved to: {curves_base_dir}")
     
@@ -576,8 +550,8 @@ def main():
         print()
     
     # Save results
-    os.makedirs('results/stapep_gnn', exist_ok=True)
-    
+    os.makedirs(RESULTS_DIR / 'stapep_gnn', exist_ok=True)
+
     results_dict = {
         'config': CONFIG,
         'dataset': {
@@ -590,7 +564,7 @@ def main():
         'curves_dir': str(curves_base_dir)
     }
     
-    json_path = f'results/stapep_gnn/stapep_gnn_comparison_{timestamp}.json'
+    json_path = str(RESULTS_DIR / 'stapep_gnn' / f'stapep_gnn_comparison_{timestamp}.json')
     with open(json_path, 'w') as f:
         json.dump(results_dict, f, indent=2)
     print(f"\n💾 Results saved to: {json_path}")

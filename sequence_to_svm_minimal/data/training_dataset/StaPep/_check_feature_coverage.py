@@ -1,7 +1,12 @@
 """Verify that all claimed-covered DRAMP IDs are fully populated in stapled_amps_features.csv."""
+from pathlib import Path
+
 import pandas as pd
 
-FEAT = r"c:/Users/bioin/Documents/SVM_ESM_Peptides/Peptide-Anti-microbial-Properties-Prediction/sequence_to_svm_minimal/data/training_dataset/StaPep/stapled_amps_features.csv"
+# This script lives in the StaPep dataset directory; resolve inputs relative to
+# it rather than a machine-specific absolute path.
+HERE = Path(__file__).resolve().parent
+FEAT = HERE / "stapled_amps_features.csv"
 
 PAPER_DRAMP_IDS = [
     # 37 paper-sheet peptides that mapped to DRAMP
@@ -57,5 +62,10 @@ def report(name: str, ids):
     print()
 
 
-report("Paper extraction sheet -> DRAMP (37)", sorted(set(PAPER_DRAMP_IDS)))
-report("Figures: 4-species + Mag(i+7)1..14 (18)", sorted(set(FIG_DRAMP_IDS)))
+def main():
+    report("Paper extraction sheet -> DRAMP (37)", sorted(set(PAPER_DRAMP_IDS)))
+    report("Figures: 4-species + Mag(i+7)1..14 (18)", sorted(set(FIG_DRAMP_IDS)))
+
+
+if __name__ == "__main__":
+    main()

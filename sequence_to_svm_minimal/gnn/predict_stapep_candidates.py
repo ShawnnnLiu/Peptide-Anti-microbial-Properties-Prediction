@@ -43,6 +43,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gnn.models import PeptideGNN
 from gnn.train import run_training
 from torch_geometric.loader import DataLoader
+from utils.paths import STAPEP_DIR, RESULTS_DIR, ESMFOLD_LOCAL_DIR
+from utils.sequence_io import parse_sequence_file
 
 
 # =============================================================================
@@ -108,12 +110,12 @@ CANDIDATES = [
 # =============================================================================
 
 CONFIG = {
-    'amp_seqs': 'data/training_dataset/StaPep/seqs_AMP_stapep.txt',
-    'decoy_seqs': 'data/training_dataset/StaPep/seqs_DECOY_stapep.txt',
-    'amp_pdb_dir': 'data/training_dataset/StaPep/structures/AMP',
-    'decoy_pdb_dir': 'data/training_dataset/StaPep/structures/DECOY',
-    'test_seqs': 'data/training_dataset/StaPep/seqs_test_stapled.txt',
-    'test_pdb_dir': 'data/training_dataset/StaPep/structures/TEST',
+    'amp_seqs': str(STAPEP_DIR / 'seqs_AMP_stapep.txt'),
+    'decoy_seqs': str(STAPEP_DIR / 'seqs_DECOY_stapep.txt'),
+    'amp_pdb_dir': str(STAPEP_DIR / 'structures' / 'AMP'),
+    'decoy_pdb_dir': str(STAPEP_DIR / 'structures' / 'DECOY'),
+    'test_seqs': str(STAPEP_DIR / 'seqs_test_stapled.txt'),
+    'test_pdb_dir': str(STAPEP_DIR / 'structures' / 'TEST'),
     'seed': 42,
     'n_folds': 5,
     'epochs': 500,
@@ -139,23 +141,6 @@ def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-
-def parse_sequence_file(input_file):
-    """Parse sequence file (index sequence per line)."""
-    sequences = []
-    with open(input_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            parts = line.split(None, 1)
-            if len(parts) == 2:
-                idx, seq = parts
-                sequences.append((idx.strip(), seq.strip()))
-            elif len(parts) == 1:
-                sequences.append((str(len(sequences) + 1), parts[0].strip()))
-    return sequences
 
 
 # =============================================================================
@@ -185,7 +170,7 @@ def generate_test_structures(candidates, output_dir, device="cuda"):
 
     from transformers import EsmForProteinFolding
 
-    local_model_path = Path(__file__).resolve().parent.parent / "models" / "esmfold_v1_local"
+    local_model_path = ESMFOLD_LOCAL_DIR
     load_dtype = torch.float16 if device == "cuda" else torch.float32
 
     if local_model_path.exists():
@@ -655,7 +640,7 @@ def main():
     # ------------------------------------------------------------------
     # Step 6: Save results
     # ------------------------------------------------------------------
-    os.makedirs('results/stapep_predictions', exist_ok=True)
+    os.makedirs(RESULTS_DIR / 'stapep_predictions', exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     results_json = {
@@ -695,7 +680,7 @@ def main():
         },
     }
 
-    json_path = f'results/stapep_predictions/predictions_{timestamp}.json'
+    json_path = str(RESULTS_DIR / 'stapep_predictions' / f'predictions_{timestamp}.json')
     with open(json_path, 'w') as f:
         json.dump(results_json, f, indent=2)
     print(f"  Results saved to: {json_path}")

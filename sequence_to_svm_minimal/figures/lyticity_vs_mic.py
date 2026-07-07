@@ -24,11 +24,14 @@ from pathlib import Path
 from scipy import stats
 from scipy.optimize import curve_fit
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+# Bootstrap project root so a standalone ``python figures/lyticity_vs_mic.py``
+# can reach the shared ``utils`` package.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils.paths import PROJECT_ROOT, STAPEP_DIR
+
 warnings.filterwarnings("ignore")
 
-BASE = Path(__file__).resolve().parent.parent
-DATA = BASE / "data" / "training_dataset" / "StaPep"
+DATA = STAPEP_DIR
 
 # ── MIC parsing (same as predict_mic_svm.py) ────────────────────────────────
 _COLI = r"(?:Escherichia\s+coli|E\.?\s*coli)(?:\s+\w+)*\s*"
@@ -124,6 +127,10 @@ LITERATURE_MIC = {
 
 
 def main():
+    # UTF-8 stdout for the μ/ρ glyphs below. Kept inside main() (not at module
+    # top) so importing this module never mutates the global sys.stdout.
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
     print("=" * 72)
     print("  Lyticity Index vs MIC (E. coli)")
     print("  StaPep lyticity_index = amphipathic helical patterning score")
@@ -415,7 +422,7 @@ def main():
     ax.grid(alpha=0.2)
 
     plt.tight_layout()
-    out = BASE / "lyticity_vs_mic.png"
+    out = PROJECT_ROOT / "lyticity_vs_mic.png"
     plt.savefig(out, dpi=180, bbox_inches="tight")
     plt.close()
     print(f"\n  Figure saved -> {out}")

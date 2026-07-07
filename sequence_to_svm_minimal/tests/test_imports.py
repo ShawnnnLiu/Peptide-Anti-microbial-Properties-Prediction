@@ -10,7 +10,10 @@ import importlib
 
 import pytest
 
-from conftest import requires_skl, requires_torch, requires_bio, requires_propy
+from conftest import (
+    PROJECT_ROOT,
+    requires_skl, requires_torch, requires_tg, requires_bio, requires_propy,
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -418,3 +421,284 @@ def test_parse_sequence_file_run_esmfold_wrapper(tmp_path):
         ("AMP_1", "1", "MKTAYIAK", 1),
         ("AMP_2", "2", "GVVDSDD", 1),
     ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# gnn/ slice — GNN library (data_utils, models, train) + 5 driver scripts.
+# All require torch + torch_geometric; importing any gnn submodule also runs
+# gnn/__init__.py, which pulls in data_utils -> Bio.PDB, hence @requires_bio too.
+# torch_geometric is only present in the WSL `venv`, so these SKIP under esm_env.
+# main()/GPU training is NEVER invoked — imports are side-effect-free (guarded).
+# ──────────────────────────────────────────────────────────────────────────────
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_data_utils():
+    mod = importlib.import_module("gnn.data_utils")
+    # The centralised Geo-24 column list — single source of truth shared with
+    # run_gnn_comparison.py. Must be exactly 24 numeric columns and must NOT
+    # carry the categorical ``ss_method`` marker (which would make it 25 and
+    # break geo_feature_dim=24).
+    cols = mod.DEFAULT_GEO_FEATURE_COLS
+    assert len(cols) == 24
+    assert cols[0] == "plddt_mean"
+    assert cols[-1] == "torsion_std"
+    assert "ss_method" not in cols
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_models():
+    mod = importlib.import_module("gnn.models")
+    assert set(mod.PeptideGNN.ARCHITECTURES) == {"gcn", "gat", "egnn"}
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_train():
+    importlib.import_module("gnn.train")
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_package():
+    """gnn/__init__.py re-exports the public API from the three submodules."""
+    mod = importlib.import_module("gnn")
+    for name in ("PeptideGNN", "PeptideGraphDataset", "run_training", "evaluate"):
+        assert hasattr(mod, name), f"gnn package missing {name}"
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_run_gnn_training():
+    """argparse CLI; main() guarded (GPU training) — never invoked in tests."""
+    importlib.import_module("gnn.run_gnn_training")
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_run_gnn_comparison():
+    """Reuses the shared QSAR_COLS and DEFAULT_GEO_FEATURE_COLS constants."""
+    mod = importlib.import_module("gnn.run_gnn_comparison")
+    from features.stapep_columns import QSAR_COLS
+    from gnn.data_utils import DEFAULT_GEO_FEATURE_COLS
+    # load_data_with_features returns the shared QSAR list verbatim.
+    assert mod.QSAR_COLS == QSAR_COLS
+    assert mod.DEFAULT_GEO_FEATURE_COLS is DEFAULT_GEO_FEATURE_COLS
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_predict_gcn_single():
+    """The inline parse_sequence_file copy was replaced with the shared helper."""
+    mod = importlib.import_module("gnn.predict_gcn_single")
+    from utils.sequence_io import parse_sequence_file
+    assert mod.parse_sequence_file is parse_sequence_file
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_predict_stapep_candidates():
+    mod = importlib.import_module("gnn.predict_stapep_candidates")
+    from utils.sequence_io import parse_sequence_file
+    assert mod.parse_sequence_file is parse_sequence_file
+
+
+@requires_torch
+@requires_tg
+@requires_bio
+def test_import_gnn_run_stapep_gnn_comparison():
+    mod = importlib.import_module("gnn.run_stapep_gnn_comparison")
+    from utils.sequence_io import parse_sequence_file
+    assert mod.parse_sequence_file is parse_sequence_file
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Shared Geo-24 column module (new in the nn_pipeline/figures/debug slice).
+# Torch-free single source of truth for the geometric-feature column list.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_import_features_geometric_columns():
+    mod = importlib.import_module("features.geometric_columns")
+    cols = mod.GEO_FEATURE_COLS
+    assert len(cols) == 24
+    assert cols[0] == "plddt_mean"
+    assert cols[-1] == "torsion_std"
+    assert "ss_method" not in cols
+    # sub-groups concatenate to the flat list, in order
+    assert (
+        mod.PLDDT_COLS + mod.COMPACTNESS_COLS + mod.SECONDARY_STRUCTURE_COLS
+        + mod.SASA_COLS + mod.SEQUENCE_COLS + mod.CURVATURE_COLS
+    ) == cols
+
+
+@requires_tg
+@requires_torch
+@requires_bio
+def test_gnn_default_geo_cols_come_from_shared_module():
+    """gnn.data_utils.DEFAULT_GEO_FEATURE_COLS is now a copy of the shared list."""
+    from gnn.data_utils import DEFAULT_GEO_FEATURE_COLS
+    from features.geometric_columns import GEO_FEATURE_COLS
+    assert DEFAULT_GEO_FEATURE_COLS == list(GEO_FEATURE_COLS)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# nn_pipeline/ slice — PyTorch MLP pipeline.
+# feature_dataset + train + models require torch (present in esm_env);
+# prepare_clusters is pandas-only.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_import_nn_pipeline_prepare_clusters():
+    """argparse CLI, pandas-only — no torch needed to import."""
+    importlib.import_module("nn_pipeline.prepare_clusters")
+
+
+@requires_torch
+def test_import_nn_pipeline_models():
+    importlib.import_module("nn_pipeline.models")
+
+
+@requires_torch
+def test_import_nn_pipeline_feature_dataset():
+    """GEOMETRIC_FEATURE_COLS now derives from the shared Geo-24 list."""
+    mod = importlib.import_module("nn_pipeline.feature_dataset")
+    from features.geometric_columns import GEO_FEATURE_COLS
+    assert mod.GEOMETRIC_FEATURE_COLS == list(GEO_FEATURE_COLS)
+
+
+@requires_torch
+def test_import_nn_pipeline_train():
+    importlib.import_module("nn_pipeline.train")
+
+
+def test_nn_pipeline_train_uses_package_qualified_imports():
+    """Regression guard: train.py must NOT use bare ``from feature_dataset import``
+    or ``from prepare_clusters import`` (those broke once the bootstrap was
+    changed to insert PROJECT_ROOT instead of the nn_pipeline/ dir)."""
+    from pathlib import Path
+    src = (PROJECT_ROOT / "nn_pipeline" / "train.py").read_text(encoding="utf-8")
+    assert "from feature_dataset import" not in src
+    assert "from prepare_clusters import" not in src
+    assert "from nn_pipeline.feature_dataset import" in src
+    assert "from nn_pipeline.prepare_clusters import" in src
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# figures/ slice — plotting scripts (import-safe; heavy work in main()).
+# ──────────────────────────────────────────────────────────────────────────────
+
+@requires_skl
+def test_import_figures_plot_mic_distribution():
+    """FEATURES / PAPER_FEATURES now alias the shared STAPEP column lists."""
+    mod = importlib.import_module("figures.plot_mic_distribution")
+    from features.stapep_columns import STAPEP_COLS, STAPEP_COLS_PAPER_14
+    assert mod.FEATURES == STAPEP_COLS
+    assert mod.PAPER_FEATURES == STAPEP_COLS_PAPER_14
+
+
+def test_import_figures_lyticity_vs_mic():
+    """Should import without overriding sys.stdout (the UTF-8 hack now lives in
+    main(), matching the predict_mic_* scripts)."""
+    import sys as _sys
+    saved = _sys.stdout
+    importlib.import_module("figures.lyticity_vs_mic")
+    assert _sys.stdout is saved, (
+        "figures.lyticity_vs_mic replaced sys.stdout on import — the UTF-8 hack "
+        "must stay inside main()"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# debug_checks/ slice — diagnostics. All now import-safe (CSV reads / model
+# loads live inside main()); the torch import in test_esmfold_quick is also
+# inside main(), so importing it needs no torch.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_import_debug_check_pyg():
+    importlib.import_module("debug_checks.check_pyg")
+
+
+def test_import_debug_check_feature_overlap():
+    """Uses the shared QSAR_COLS + GEO_FEATURE_COLS constants."""
+    mod = importlib.import_module("debug_checks.check_feature_overlap")
+    assert hasattr(mod, "main")
+
+
+def test_import_debug_check_feature_overlap_detailed():
+    importlib.import_module("debug_checks.check_feature_overlap_detailed")
+
+
+def test_import_debug_check_features():
+    importlib.import_module("debug_checks.check_features")
+
+
+def test_import_debug_check_features_fixed():
+    importlib.import_module("debug_checks.check_features_fixed")
+
+
+@requires_bio
+def test_import_debug_secondary_structure():
+    importlib.import_module("debug_checks.debug_secondary_structure")
+
+
+def test_import_debug_test_esmfold_quick():
+    """Import-safe: the torch/ESMFold load lives inside main()."""
+    importlib.import_module("debug_checks.test_esmfold_quick")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# cli/ stubs — empty TODO scaffolding. Must at least import as no-ops.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_import_cli_extract_features():
+    importlib.import_module("cli.extract_features")
+
+
+def test_import_cli_predict_mic():
+    importlib.import_module("cli.predict_mic")
+
+
+def test_import_cli_train_model():
+    importlib.import_module("cli.train_model")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# StaPep diagnostic scripts — live under data/training_dataset/StaPep/, which is
+# NOT an importable package (no __init__.py chain), so they are loaded by file
+# path. Importing them must be side-effect-free: every CSV read now lives inside
+# main() (some were previously executing at module level with hardcoded absolute
+# paths). The data-generation / MD scripts in that folder are deliberately NOT
+# listed here — several write canonical CSVs at module level and must never be
+# imported.
+# ──────────────────────────────────────────────────────────────────────────────
+
+_STAPEP_DIAGNOSTICS = [
+    "_check_all_nan.py",
+    "_check_mag_i7.py",
+    "_check_feature_coverage.py",
+    "_verify_training_md4ns.py",
+    "_compare_replicate_md.py",
+    "_inspect_md50ns_in_progress.py",
+    "sanity_check_md_features.py",
+]
+
+
+@pytest.mark.parametrize("script_name", _STAPEP_DIAGNOSTICS)
+def test_stapep_diagnostic_import_safe(script_name):
+    """Each pandas-only StaPep diagnostic loads without reading any CSV (its
+    body is guarded by main())."""
+    import importlib.util
+    path = PROJECT_ROOT / "data" / "training_dataset" / "StaPep" / script_name
+    assert path.exists(), f"missing {path}"
+    spec = importlib.util.spec_from_file_location(script_name[:-3], str(path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # runs module body; main() is not called
+    assert hasattr(mod, "main"), f"{script_name} has no main() guard"

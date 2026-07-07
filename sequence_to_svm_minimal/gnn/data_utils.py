@@ -65,6 +65,24 @@ VOL_MIN, VOL_MAX = 60.1, 227.8
 
 
 # =============================================================================
+# GEOMETRIC FEATURE COLUMNS
+# =============================================================================
+
+# The 24 numeric geometric-feature columns attached to a graph via
+# ``data.geo_features`` (the "Geo-24" feature set), shared by
+# ``PeptideGraphDataset`` (default columns) and ``run_gnn_comparison.py``.
+# The canonical list lives in the dependency-free ``features.geometric_columns``
+# module so the pandas-only debug scripts and the torch-based MLP/GNN code all
+# agree on it. Note it deliberately excludes the ``ss_method`` flag that
+# ``features.geometric_features.get_feature_names`` carries — that column is a
+# categorical marker, not a model input, so keeping it here would change
+# ``geo_feature_dim`` from 24 to 25.
+from features.geometric_columns import GEO_FEATURE_COLS as _GEO_FEATURE_COLS
+
+DEFAULT_GEO_FEATURE_COLS = list(_GEO_FEATURE_COLS)
+
+
+# =============================================================================
 # PDB PARSING
 # =============================================================================
 
@@ -332,16 +350,7 @@ class PeptideGraphDataset(Dataset):
         
         # Default geometric feature columns
         if geometric_feature_cols is None:
-            self.geo_cols = [
-                'plddt_mean', 'plddt_std', 'plddt_min', 'plddt_max',
-                'radius_gyration', 'end_to_end_distance', 'max_pairwise_distance',
-                'centroid_distance_mean', 'centroid_distance_std',
-                'fraction_helix', 'fraction_sheet', 'fraction_coil',
-                'total_sasa', 'hydrophobic_sasa', 'fraction_hydrophobic_sasa',
-                'length', 'net_charge', 'mean_hydrophobicity', 'hydrophobic_moment',
-                'curvature_mean', 'curvature_std', 'curvature_max',
-                'torsion_mean', 'torsion_std'
-            ]
+            self.geo_cols = list(DEFAULT_GEO_FEATURE_COLS)
         else:
             self.geo_cols = geometric_feature_cols
         
