@@ -1,0 +1,3 @@
+# Keep generated visualization pages in the repo, but exclude them from
+# GitHub's language statistics so the project reads as Python.
+*.html linguist-generated
